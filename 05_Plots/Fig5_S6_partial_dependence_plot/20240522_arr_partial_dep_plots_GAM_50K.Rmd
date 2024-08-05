@@ -1,0 +1,476 @@
+---
+title: "Arrange partial dep. plots (GAM) 10K per year"
+author: "Stenka Vulova"
+date: '2024-05-15'
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+#library(raster)
+library(terra)
+library(rgdal)
+library(lubridate)
+#library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+#library(rgeos)
+
+#library(grid)
+#library(spatstat)
+#library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+#library(ggspatial)
+#library(geobuffer)
+#library(rgeos)
+
+library(tools)
+
+library(data.table)
+
+library(colorspace)
+
+library(ggpointdensity)
+library(mgcv)
+
+```
+
+# TCD
+
+## Load dataset
+
+50K dataset (10K from each year)
+
+```{r load data }
+
+comb_df_TCD = read.csv("D:/Stenka_Cliwac/Topic_1/05_RESULTS/20240426_red_dfs_depend_plots/10K_per_year/TCD_dep_df_50K.csv")
+
+glimpse(comb_df_TCD)
+
+#Rows: 50,000
+#Columns: 3
+
+```
+
+
+## Plot 
+
+```{r scatterplot }
+
+# helps me decide how to set ylim
+min(comb_df_TCD$SHAP_value) # -2.354232
+max(comb_df_TCD$SHAP_value) # 2.226146
+
+tic("ggplot")
+
+dep_plot_TCD = ggplot(data = comb_df_TCD, aes(x = TCD, y = SHAP_value)) +
+  geom_pointdensity(size = 1.4) +  # Scatter plot
+  scale_color_viridis_c(name = "No. of neighbors")+
+  geom_smooth(method = "loess", se = FALSE, color = "red", alpha = 0.5, size = 1.5) +  # Loess smoothing
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +  # Horizontal line at y=0
+  labs(x = "Tree cover density (%)", y = "SHAP value") +  # Set x-axis label
+  ylim(-2, 2) +  
+  theme_bw()+ 
+    theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15),
+        axis.title = element_text(size = 20),
+        strip.text = element_text(size = 20),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 16)) 
+
+dep_plot_TCD
+
+ggsave('D:/Stenka_Cliwac/Topic_1/06_R_SCRIPTS/20240515_partial_dep_plots/dep_plot_allyears_TCD_50K_dens.png', plot=dep_plot_TCD, device='png', dpi=300, width=10, height= 5 )
+
+toc()
+
+tictoc::tic.log()
+
+# ggplot: 50.31 sec elapsed
+
+```
+
+# broadleaf_perc
+
+## Load dataset
+
+50K dataset (10K from each year)
+
+```{r load data }
+
+comb_df_broadleaf_perc = read.csv("D:/Stenka_Cliwac/Topic_1/05_RESULTS/20240426_red_dfs_depend_plots/10K_per_year/broadleaf_perc_dep_df_50K.csv")
+
+glimpse(comb_df_broadleaf_perc)
+
+# comb_df$broadleaf_perc100 = comb_df$broadleaf_perc*100
+comb_df_broadleaf_perc$broadleaf_perc100 = comb_df_broadleaf_perc$broadleaf_perc * 100
+
+#Rows: 50,000
+#Columns: 3
+
+```
+
+
+## Plot 
+
+```{r scatterplot }
+
+# helps me decide how to set ylim
+min(comb_df_broadleaf_perc$SHAP_value) # -2.354232
+max(comb_df_broadleaf_perc$SHAP_value) # 2.226146
+
+tic("ggplot")
+
+dep_plot_broadleaf_perc = ggplot(data = comb_df_broadleaf_perc, aes(x = broadleaf_perc100, y = SHAP_value)) +
+  geom_pointdensity(size = 1.4) +  # Scatter plot
+  scale_color_viridis_c(name = "No. of neighbors")+
+  geom_smooth(method = "loess", se = FALSE, color = "red", alpha = 0.5, size = 1.5) +  # Loess smoothing
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +  # Horizontal line at y=0
+  labs(x = "Broadleaf (%)", y = "SHAP value") +  # Set x-axis label
+  ylim(-2, 2) +  
+  theme_bw()+ 
+    theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15),
+        axis.title = element_text(size = 20),
+        strip.text = element_text(size = 20),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 16)) 
+
+dep_plot_broadleaf_perc
+
+ggsave('D:/Stenka_Cliwac/Topic_1/06_R_SCRIPTS/20240515_partial_dep_plots/dep_plot_allyears_broadleaf_perc_50K_dens.png', plot=dep_plot_broadleaf_perc, device='png', dpi=300, width=10, height= 5 )
+
+toc()
+
+tictoc::tic.log()
+
+# ggplot: 50.31 sec elapsed
+
+```
+
+# canopyheight
+
+## Load dataset
+
+50K dataset (10K from each year)
+
+```{r load data }
+
+comb_df_canopyheight = read.csv("D:/Stenka_Cliwac/Topic_1/05_RESULTS/20240426_red_dfs_depend_plots/10K_per_year/canopyheight_dep_df_50K.csv")
+
+glimpse(comb_df_canopyheight)
+
+#Rows: 50,000
+#Columns: 3
+
+```
+
+
+## Plot 
+
+```{r scatterplot }
+
+# helps me decide how to set ylim
+min(comb_df_canopyheight$SHAP_value) # -2.354232
+max(comb_df_canopyheight$SHAP_value) # 2.226146
+
+tic("ggplot")
+
+dep_plot_canopyheight = ggplot(data = comb_df_canopyheight, aes(x = canopyheight, y = SHAP_value)) +
+  geom_pointdensity(size = 1.4) +  # Scatter plot
+  scale_color_viridis_c(name = "No. of neighbors")+
+  geom_smooth(method = "loess", se = FALSE, color = "red", alpha = 0.5, size = 1.5) +  # Loess smoothing
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +  # Horizontal line at y=0
+  labs(x = "Canopy height (m)", y = "SHAP value") +  # Set x-axis label
+  ylim(-2, 2) +  
+  theme_bw()+ 
+    theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15),
+        axis.title = element_text(size = 20),
+        strip.text = element_text(size = 20),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 16)) 
+
+dep_plot_canopyheight
+
+ggsave('D:/Stenka_Cliwac/Topic_1/06_R_SCRIPTS/20240515_partial_dep_plots/dep_plot_allyears_canopyheight_50K_dens.png', plot=dep_plot_canopyheight, device='png', dpi=300, width=10, height= 5 )
+
+toc()
+
+tictoc::tic.log()
+
+# ggplot: 50.31 sec elapsed
+
+```
+
+# SPEI_sameyear
+
+## Load dataset
+
+50K dataset (10K from each year)
+
+```{r load data }
+
+comb_df_SPEI_sameyear = read.csv("D:/Stenka_Cliwac/Topic_1/05_RESULTS/20240426_red_dfs_depend_plots/10K_per_year/SPEI_sameyear_dep_df_50K.csv")
+
+glimpse(comb_df_SPEI_sameyear)
+
+#Rows: 50,000
+#Columns: 3
+
+```
+
+
+## Plot 
+
+```{r scatterplot }
+
+# helps me decide how to set ylim
+min(comb_df_SPEI_sameyear$SHAP_value) # -2.354232
+max(comb_df_SPEI_sameyear$SHAP_value) # 2.226146
+
+tic("ggplot")
+
+dep_plot_SPEI_sameyear = ggplot(data = comb_df_SPEI_sameyear, aes(x = SPEI_sameyear, y = SHAP_value)) +
+  geom_pointdensity(size = 1.4) +  # Scatter plot
+  scale_color_viridis_c(name = "No. of neighbors")+
+  geom_smooth(method = "loess", se = FALSE, color = "red", alpha = 0.5, size = 1.5) +  # Loess smoothing
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +  # Horizontal line at y=0
+  labs(x = "SPEI (same year) (-)", y = "SHAP value") +  # Set x-axis label
+  ylim(-2, 2) +  
+  theme_bw()+ 
+    theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15),
+        axis.title = element_text(size = 20),
+        strip.text = element_text(size = 20),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 16)) 
+
+dep_plot_SPEI_sameyear
+
+ggsave('D:/Stenka_Cliwac/Topic_1/06_R_SCRIPTS/20240515_partial_dep_plots/dep_plot_allyears_SPEI_sameyear_50K_dens.png', plot=dep_plot_SPEI_sameyear, device='png', dpi=300, width=10, height= 5 )
+
+toc()
+
+tictoc::tic.log()
+
+# ggplot: 50.31 sec elapsed
+
+```
+
+
+# ET_1year
+
+## Load dataset
+
+50K dataset (10K from each year)
+
+```{r load data }
+
+comb_df_ET_1year = read.csv("D:/Stenka_Cliwac/Topic_1/05_RESULTS/20240426_red_dfs_depend_plots/10K_per_year/ET_1year_dep_df_50K.csv")
+
+glimpse(comb_df_ET_1year)
+
+#Rows: 50,000
+#Columns: 3
+
+```
+
+
+## Plot 
+
+```{r scatterplot }
+
+# helps me decide how to set ylim
+min(comb_df_ET_1year$SHAP_value) # -2.354232
+max(comb_df_ET_1year$SHAP_value) # 2.226146
+
+tic("ggplot")
+
+dep_plot_ET_1year = ggplot(data = comb_df_ET_1year, aes(x = ET_1year, y = SHAP_value)) +
+  geom_pointdensity(size = 1.4) +  # Scatter plot
+  scale_color_viridis_c(name = "No. of neighbors")+
+  geom_smooth(method = "loess", se = FALSE, color = "red", alpha = 0.5, size = 1.5) +  # Loess smoothing
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +  # Horizontal line at y=0
+  labs(x = "ET, annual sum (1 year ago) (mm)", y = "SHAP value") +  # Set x-axis label
+  ylim(-2, 2) +  
+  theme_bw()+ 
+    theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15),
+        axis.title = element_text(size = 20),
+        strip.text = element_text(size = 20),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 16)) 
+
+dep_plot_ET_1year
+
+ggsave('D:/Stenka_Cliwac/Topic_1/06_R_SCRIPTS/20240515_partial_dep_plots/dep_plot_allyears_ET_1year_50K_dens.png', plot=dep_plot_ET_1year, device='png', dpi=300, width=10, height= 5 )
+
+toc()
+
+tictoc::tic.log()
+
+# ggplot: 50.31 sec elapsed
+
+```
+
+# forest_prox
+
+## Load dataset
+
+50K dataset (10K from each year)
+
+```{r load data }
+
+comb_df_forest_prox = read.csv("D:/Stenka_Cliwac/Topic_1/05_RESULTS/20240426_red_dfs_depend_plots/10K_per_year/forest_prox_dep_df_50K.csv")
+
+glimpse(comb_df_forest_prox)
+
+#Rows: 50,000
+#Columns: 3
+
+```
+
+
+## Plot 
+
+```{r scatterplot }
+
+# helps me decide how to set ylim
+min(comb_df_forest_prox$SHAP_value) # -2.354232
+max(comb_df_forest_prox$SHAP_value) # 2.226146
+
+tic("ggplot")
+
+dep_plot_forest_prox = ggplot(data = comb_df_forest_prox, aes(x = forest_prox, y = SHAP_value)) +
+  geom_pointdensity(size = 1.4) +  # Scatter plot
+  scale_color_viridis_c(name = "No. of neighbors")+
+  geom_smooth(method = "loess", se = FALSE, color = "red", alpha = 0.5, size = 1.5) +  # Loess smoothing
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", size = 0.8) +  # Horizontal line at y=0
+  labs(x = "Distance to forest edge (m)", y = "SHAP value") +  # Set x-axis label
+  ylim(-2, 2) +  
+  theme_bw()+ 
+    theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15),
+        axis.title = element_text(size = 20),
+        strip.text = element_text(size = 20),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 16)) 
+
+dep_plot_forest_prox
+
+ggsave('D:/Stenka_Cliwac/Topic_1/06_R_SCRIPTS/20240515_partial_dep_plots/dep_plot_allyears_forest_prox_50K_dens.png', plot=dep_plot_forest_prox, device='png', dpi=300, width=10, height= 5 )
+
+toc()
+
+tictoc::tic.log()
+
+# ggplot: 50.31 sec elapsed
+
+```
+
+
+# Join the tables together 
+
+```{r join the tables together }
+
+glimpse(comb_df_TCD)
+colnames(comb_df_TCD)[1] <- "predictor_value"
+comb_df_TCD$Predictor = 'TCD'
+
+colnames(comb_df_broadleaf_perc)[1] <- "predictor_value"
+comb_df_broadleaf_perc$predictor_value = comb_df_broadleaf_perc$predictor_value *100
+comb_df_broadleaf_perc$Predictor = 'broadleaf_perc'
+comb_df_broadleaf_perc$broadleaf_perc100 = NULL
+
+colnames(comb_df_canopyheight)[1] <- "predictor_value"
+comb_df_canopyheight$Predictor = 'canopyheight'
+
+colnames(comb_df_SPEI_sameyear)[1] <- "predictor_value"
+comb_df_SPEI_sameyear$Predictor = 'SPEI_sameyear'
+
+colnames(comb_df_ET_1year)[1] <- "predictor_value"
+comb_df_ET_1year$Predictor = 'ET_1year'
+
+colnames(comb_df_forest_prox)[1] <- "predictor_value"
+comb_df_forest_prox$Predictor = 'forest_prox'
+
+df_allpreds = rbind(comb_df_broadleaf_perc, comb_df_canopyheight, comb_df_ET_1year, comb_df_forest_prox, comb_df_SPEI_sameyear, comb_df_TCD)
+
+glimpse(df_allpreds)
+# Rows: 300,000
+# Columns: 4
+
+#6 *50000
+
+```
+
+# Facet_wrap plot
+
+```{r strip labels }
+
+my_strip_labels <- as_labeller(c(
+  "TCD" = "Tree cover density (%)",
+  "broadleaf_perc" = "Broadleaf (%)",
+  "canopyheight" = "Canopy height (m)",
+   "SPEI_sameyear" = "SPEI (same year) (-)",
+  "ET_1year" = "ET, annual sum (1 year ago) (mm)",
+  "forest_prox" = "Distance to forest edge (m)"
+))
+
+```
+
+```{r ggplot facet_wrap }
+
+tic("ggplot facet")
+
+dep_plot_facet = ggplot(data = df_allpreds, aes(x = predictor_value, y = SHAP_value)) +
+  geom_pointdensity(size = 1.4) +  # Scatter plot
+  scale_color_viridis_c(name = "No. of neighbors")+
+  geom_smooth(method = "gam", se = FALSE, color = "red", alpha = 0.5, size = 1.3) +  
+  geom_hline(yintercept = 0, linetype = "dashed", color = "orange2", size = 1) +  # Horizontal line at y=0
+  labs(x = NULL, y = "SHAP value") +  # Set x-axis label
+  ylim(-2, 2) +  
+  theme_bw()+ 
+    facet_wrap(
+    facets = ~Predictor, scales = "free_x", 
+    labeller = my_strip_labels,  # add labels
+    strip.position = "bottom") +
+  theme(
+    strip.placement = "outside",
+    strip.background = element_blank()
+  )+
+    theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15),
+        axis.title = element_text(size = 20),
+        strip.text = element_text(size = 20),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 16)) 
+
+dep_plot_facet
+
+ggsave('D:/Stenka_Cliwac/Topic_1/06_R_SCRIPTS/20240522_partial_dep_plots_GAM/dep_plot_allpredictors_50K_GAM.png', plot=dep_plot_facet, device='png', dpi=300, width=17, height= 10 )
+
+toc()
+
+tictoc::tic.log()
+
+# ggplot facet: 72.67 sec elapsed
+
+```
+
+

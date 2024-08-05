@@ -1,0 +1,290 @@
+---
+title: "SHAP figure for SPEI_sameyear and 2018"
+author: "Stenka Vulova"
+date: '2024-04-16'
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+library(rgeos)
+
+library(tools)
+library(tibble)
+
+```
+
+# Import Brandenburg and Berlin border
+
+Keep Berlin in the plots :) 
+
+```{r import border }
+
+BB_border = readOGR(dsn = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border",
+                        layer = "BB_border_merged")
+
+crs(BB_border)
+# CRS arguments: +proj=longlat +datum=WGS84 +no_defs 
+
+plot(BB_border)
+
+# +proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs
+#BB_LAEA = sp::spTransform(BB_border, CRSobj = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+
+```
+
+# Load training df
+
+You don't need to run this part. I just used it to get which column number each predictor has.
+You need to add 1 to the predictor column number (see below); for example `19. SPEI_sameyear` in the `trainX_df` is column 20 in the SHAP dfs (because first column in SHAP dfs is the modelled class).
+
+This was used for training. I will use this df to infer the column # of the predictor I want to plot. 
+
+```{r load df }
+
+tic("load train df")
+
+trainX_df = read.csv("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Dfs_for_SHAP_mapping/X_all_2018.csv")
+
+toc()
+
+tic.clearlog()
+
+#load train df: 816.68 sec elapsed
+
+glimpse(trainX_df)
+
+summary(trainX_df)
+
+#Rows: 10,406,171
+#Columns: 41
+
+# get the column names 
+
+colnames_trainX = colnames(trainX_df)
+
+write.csv(colnames_trainX, )
+
+colnames_trainX[41]
+# "SWI_15cm_1year"
+
+# Create a list of column names with their corresponding column numbers
+paste0(seq_along(colnames_trainX), ". ", colnames_trainX)
+
+#  [1] "1. ag_prox"               "2. aspect"                "3. bdod"                  "4. broadleaf_perc"        "5. SPEI_sameyear"          "6. cec"                  
+#  [7] "7. cfvo"                  "8. clay"                  "9. elevation"             "10. forest_prox"          "11. AWC"                  "12. nitrogen"            
+# [13] "13. ocd"                  "14. ocs"                  "15. sand"                 "16. silt"                 "17. slope"                "18. soc"                 
+# [19] "19. SPEI_sameyear"                  "20. TWI"                  "21. water_prox"           "22. airtemp_sameyear"     "23. ET_sameyear"          "24. rad_direct_sameyear" 
+# [25] "25. SMI_sameyear"         "26. SPEI_sameyear"        "27. SSM_sameyear"         "28. SWI_15cm_sameyear"    "29. groundwater_sameyear" "30. gw_trend_sameyear"   
+# [31] "31. LST_sameyear"         "32. airtemp_1year"        "33. ET_1year"             "34. groundwater_1year"    "35. gw_trend_1year"       "36. LST_1year"           
+# [37] "37. rad_direct_1year"     "38. SMI_1year"            "39. SPEI_1year"           "40. SSM_1year"            "41. SWI_15cm_1year" 
+
+```
+
+# SHAP dataframe
+
+```{r import the df }
+
+tic("load SHAP df")
+
+# # Load only columns of the SHAP dataframe
+# cols_SHAPdf = read.table("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240415_SHAP.df_NEW/colnames_SHAPdf.csv", sep = ",", header = FALSE)
+# 
+# # Select the top highest ranked predictors based on the "all years" SHAP summary plot. 
+# top_pred_names = c("TCD", "broadleaf_perc", "SPEI_sameyear", "SPEI_sameyear", "ET_1year")
+# 
+# # Match the names in top_pred_names with the values in the "V1" column of cols_SHAPdf
+# matched_rows <- match(top_pred_names, cols_SHAPdf$V1, nomatch = 0)
+
+shap_df_path = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2018_SHAP.csv"
+
+# Use fread() to read only the first column
+# first column is the modeled class
+
+# SPEI_sameyear is column 26 originally, so it is column 27 here
+# because first column here is the predicted classes, then the SHAP values for the predictors
+
+shap_df <- data.table::fread(shap_df_path, select = 27, header = TRUE)
+
+toc()
+
+tic.clearlog()
+
+glimpse(shap_df)
+# Rows: 7,708
+# Columns: 25
+
+#just column 1 
+#load SHAP df: 82.26 sec sec elapsed
+#Rows: 10,406,171
+#Columns: 1
+
+# I expect there to be 42 columns in the SHAP df. 
+# 1st column is the class and 41 cols for predictors' SHAP values
+
+#rror in data.table::fread(shap_df_path, select = 43, header = TRUE) : 
+#  Column number 43 (select[1]) is too large for this table, which only has 42 columns.
+
+# yes, it has 42 cols
+
+```
+
+# Coordinates dataframe 
+
+I am loading the coordinates. 
+
+```{r load coords }
+
+#true_class <- mod_df[, (names(mod_df) %in% c("x", "y", "coord_code", "true_class", "NDMI_anomaly"))]
+
+true_class_path = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230927_modeling_df/true_class/true_class_2018.csv"
+
+# first two columns are x and y 
+
+coords_df <- data.table::fread(true_class_path, select = c(1,2), header = TRUE)
+
+glimpse(coords_df)
+
+# Rows: 10,406,171
+# Columns: 2
+# x
+# y
+
+```
+# Make into one df 
+
+x, y, and SHAP value of a certain predictor 
+
+```{r new df with coords and SHap values }
+
+shap_df_coords = cbind(coords_df, shap_df)
+
+glimpse(shap_df_coords)
+
+# Rows: 10,432,546
+#Columns: 3
+# x
+# y
+# `18`
+
+# rename third column to SHAP value
+
+names(shap_df_coords)[3] <- "SHAP_value"
+
+```
+
+# Convert to raster 
+
+## Load static data
+
+Static predictors co-registered to NDMI. 
+This is just to get the CRS from it. No need to run this.
+
+```{r Load static data }
+
+#examp_rast = raster::raster("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230926_data_proj/Static_data_proj/broadleaf_proj.tif")
+
+#raster::plot(examp_rast, col=colorRampPalette(c("#460000", "#930c0c", "#ff2100", "#ff980c",
+#                                 "#fcf599", "#00ff9b", "#39b5ff","#002ae7",
+#                                "#020d47"))(255))
+
+#examp_rast
+
+# crs        : +proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs
+
+```
+
+## Raster conversion
+
+```{r convert to raster }
+
+SHAP_rast = terra::rast(shap_df_coords, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+
+# the reason I converted to lonlat is to include the scalebar (it didnt work with the other projection)
+SHAP_rast_lonlat = terra::project(x = SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+
+# convert to raster::raster for plotting
+SHAP_r = raster::raster(SHAP_rast_lonlat)
+
+raster::plot(SHAP_r, colNA = "lightgray", col=colorRampPalette(c("#460000", "#930c0c", "#ff2100", "#ff980c",
+                                 "#fcf599", "#00ff9b", "#39b5ff","#002ae7",
+                                "#020d47"))(255),
+             legend.args = list(text = "SHAP value", line = 0.5, cex = 1, adj = 0.25))
+
+minValue(SHAP_r) # -0.5437935
+maxValue(SHAP_r) # 0.6043676
+
+
+```
+
+# Final plot 
+
+The one I am saving. 
+
+```{r plot it}
+
+
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240422_SHAP_predictor_maps/20240423_SPEI_sameyear_SHAP_plots/SPEI_sameyear_SHAP_map_2018.png", width = 8, height =7, units = "in", res = 300)
+
+raster::plot(SHAP_r, col = colorRampPalette(c("#020d47", "#002ae7", "#39b5ff", "#00ff9b", "#fcf599", "#ff980c", "#F36802", "#F82602", "#7F0000"))(255),
+             legend.args = list(text = "SHAP value", line = 0.5, cex = 1, adj = 0.25),
+   #               xlim = c(11.26573, 14.7657), # Adjust the x-axis limits accordingly
+   #  ylim = c(51.35902, 53.5587), # Adjust the y-axis limits accordingly
+ #                 zlim = c(-1.771957, 2.35251),
+             legend = TRUE, axes = FALSE, box = FALSE)
+
+
+# only the legend
+#plot(SHAP_r, col = colorRampPalette(c("#020d47", "#002ae7", "#39b5ff", "#00ff9b", "#fcf599", "#ff980c", "#F36802", "#F82602", "#7F0000"))(255) ,
+#     legend.only = TRUE, horizontal = FALSE , smallplot = c(0.87, 0.9, 0.17, 0.86),
+ #                      zlim = c(-1.771957, 2.35251),
+ #    axis.args = list(cex.axis = 1.8), 
+#	legend.args = list(text = "SHAP value", line = 0.5, cex = 1, adj = 0.25))
+
+# add scalebar 
+raster::scalebar(d = 50, # distance in km,
+                 xy = c(11.5, 51.5),
+                 type = "bar",
+                 divs = 2,
+                 below = "km",
+                 lonlat = TRUE,
+                adj = c(0.5, -1.15),
+                 cex = 1.2)
+
+# Berlin Brandenburg border
+raster::plot(BB_border, add = TRUE)
+
+
+dev.off()
+
+```
+
+

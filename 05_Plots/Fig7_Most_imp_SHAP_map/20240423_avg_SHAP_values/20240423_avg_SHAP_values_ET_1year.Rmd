@@ -1,0 +1,469 @@
+---
+title: "Average SHAP values (ET_1year)"
+author: "Stenka Vulova"
+date: '2024-04-23'
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+library(rgeos)
+
+library(tools)
+library(tibble)
+
+```
+
+```{r import SHAP df names }
+
+# column names of SHAP dfs
+cols_SHAPdf = read.table("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/colnames_SHAPdf.csv", sep = ",", header = FALSE)
+
+```
+
+# Select a predictor
+
+Select which predictor you want to analyze (and get what column # it is in SHAP dfs)
+
+```{r select the top predictors }
+
+pred_name = "ET_1year"
+
+# Match the names in pred_name with the values in the "V1" column of cols_SHAPdf
+matched_rows <- match(pred_name, cols_SHAPdf$V1, nomatch = 0)
+
+# Filter out the matched row numbers
+matched_rows <- matched_rows[matched_rows > 0]
+
+# Print the list of row numbers
+print(matched_rows) # 34
+
+# 34: ET_1year
+
+# looks good. 
+
+```
+
+# Load the SHAP df 2018 
+
+```{r import the 2018 df }
+
+tic("load 2018 SHAP df")
+
+shap_df_path_2018 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2018_SHAP.csv"
+
+# read only a selected column name e.g. predictor
+shap_df_2018 <- data.table::fread(shap_df_path_2018, select = matched_rows, header = TRUE)
+
+toc()
+
+tic.clearlog()
+# load 2018 SHAP df: 430.24 sec elapsed
+
+glimpse(shap_df_2018)
+# Rows: 10,406,171
+# Columns: 1
+
+# assign the column name as the selected predictor 
+colnames(shap_df_2018) = "2018"
+
+```
+
+# Coordinates df 2018 
+
+I am loading the coordinates. 
+
+```{r load coords 2018 }
+
+# reference to see column names in true_class dfs
+#true_class <- mod_df[, (names(mod_df) %in% c("x", "y", "coord_code", "true_class", "NDMI_anomaly"))]
+
+true_class_path_2018 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230927_modeling_df/true_class/true_class_2018.csv"
+
+# first two columns are x and y 
+
+coords_df_2018 <- data.table::fread(true_class_path_2018, select = c(1,2), header = TRUE)
+
+glimpse(coords_df_2018)
+
+# Rows: 10,406,171
+# Columns: 2
+# x
+# y
+
+```
+
+# Make into one df 2018
+
+```{r new df with coords 2018 }
+
+SHAPdf_coords_2018 = cbind(coords_df_2018, shap_df_2018)
+
+glimpse(SHAPdf_coords_2018)
+
+# Rows: 10,406,171
+# Columns: 3
+# x
+# y
+# '2018'
+
+```
+
+# Load the SHAP df 2019
+
+```{r import the 2019 df }
+
+tic("load 2019 SHAP df")
+
+shap_df_path_2019 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2019_SHAP.csv"
+
+# read only a selected column name e.g. predictor
+shap_df_2019 <- data.table::fread(shap_df_path_2019, select = matched_rows, header = TRUE)
+
+toc()
+
+tic.clearlog()
+# load 2019 SHAP df: 237.72 sec elapsed
+
+glimpse(shap_df_2019)
+# Rows: 10,437,444
+# Columns: 1
+
+colnames(shap_df_2019) = "2019"
+
+```
+
+# Coordinates df 2019 
+
+I am loading the coordinates. 
+
+```{r load coords 2019 }
+
+# reference to see column names in true_class dfs
+# true_class <- mod_df[, (names(mod_df) %in% c("x", "y", "coord_code", "true_class", "NDMI_anomaly"))]
+
+true_class_path_2019 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230927_modeling_df/true_class/true_class_2019_KH.csv"
+
+# first two columns are x and y 
+
+coords_df_2019 <- data.table::fread(true_class_path_2019, select = c(1,2), header = TRUE)
+
+glimpse(coords_df_2019)
+
+# Rows: 10,437,444
+# Columns: 2
+# x
+# y
+
+```
+
+# Make into one df 2019
+
+```{r new df with coords 2019 }
+
+SHAPdf_coords_2019 = cbind(coords_df_2019, shap_df_2019)
+
+glimpse(SHAPdf_coords_2019)
+
+# Rows: 10,437,444
+# Columns: 3
+# x
+# y
+# ET_1year_2019
+
+```
+
+# Load the SHAP df 2020 
+
+```{r import the 2020 df }
+
+tic("load 2020 SHAP df")
+
+shap_df_path_2020 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2020_SHAP.csv"
+
+# read only a selected column name e.g. predictor
+shap_df_2020 <- data.table::fread(shap_df_path_2020, select = matched_rows, header = TRUE)
+
+toc()
+
+tic.clearlog()
+# load 2020 SHAP df: 307.94 sec elapsed
+
+glimpse(shap_df_2020)
+# Rows: 10,434,985
+# Columns: 1
+
+# assign the column name as the selected predictor 
+colnames(shap_df_2020) = "2020"
+
+```
+
+# Coordinates df 2020 
+
+I am loading the coordinates. 
+
+```{r load coords 2020 }
+
+# reference to see column names in true_class dfs
+#true_class <- mod_df[, (names(mod_df) %in% c("x", "y", "coord_code", "true_class", "NDMI_anomaly"))]
+
+true_class_path_2020 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230927_modeling_df/true_class/true_class_2020.csv"
+
+# first two columns are x and y 
+
+coords_df_2020 <- data.table::fread(true_class_path_2020, select = c(1,2), header = TRUE)
+
+glimpse(coords_df_2020)
+
+# Rows: 10,434,985
+# Columns: 2
+# x
+# y
+
+```
+
+# Make into one df 2020
+
+```{r new df with coords 2020 }
+
+SHAPdf_coords_2020 = cbind(coords_df_2020, shap_df_2020)
+
+glimpse(SHAPdf_coords_2020)
+
+# Rows: 10,434,985
+# Columns: 3
+# x
+# y
+# ET_1year_2020
+
+```
+
+# Load the SHAP df 2021 
+
+```{r import the 2021 df }
+
+tic("load 2021 SHAP df")
+
+shap_df_path_2021 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2021_SHAP.csv"
+
+# read only a selected column name e.g. predictor
+shap_df_2021 <- data.table::fread(shap_df_path_2021, select = matched_rows, header = TRUE)
+
+toc()
+
+tic.clearlog()
+# load 2021 SHAP df: 434.46 sec elapsed
+
+glimpse(shap_df_2021)
+# Rows: 9,624,727
+# Columns: 1
+
+colnames(shap_df_2021) = "2021"
+
+
+```
+
+# Coordinates df 2021 
+
+I am loading the coordinates. 
+
+```{r load coords 2021 }
+
+# reference to see column names in true_class dfs
+#true_class <- mod_df[, (names(mod_df) %in% c("x", "y", "coord_code", "true_class", "NDMI_anomaly"))]
+
+true_class_path_2021 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230927_modeling_df/true_class/true_class_2021.csv"
+
+# first two columns are x and y 
+
+coords_df_2021 <- data.table::fread(true_class_path_2021, select = c(1,2), header = TRUE)
+
+glimpse(coords_df_2021)
+
+# Rows: 9,624,727
+# Columns: 2
+# x
+# y
+
+```
+
+# Make into one df 2021
+
+```{r new df with coords 2021 }
+
+SHAPdf_coords_2021 = cbind(coords_df_2021, shap_df_2021)
+
+glimpse(SHAPdf_coords_2021)
+
+# Rows: 9,624,727
+# Columns: 3
+# x
+# y
+# ET_1year_2021
+
+```
+
+# Load the SHAP df 2022 
+
+```{r import the 2022 df }
+
+tic("load 2022 SHAP df")
+
+shap_df_path_2022 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2022_SHAP.csv"
+
+# read only a selected column name e.g. predictor
+shap_df_2022 <- data.table::fread(shap_df_path_2022, select = matched_rows, header = TRUE)
+
+toc()
+
+tic.clearlog()
+# load 2022 SHAP df: 243.42 sec elapsed
+
+glimpse(shap_df_2022)
+# Rows: 10,432,546
+# Columns: 1
+
+colnames(shap_df_2022) = "2022"
+
+```
+
+# Coordinates df 2022 
+
+I am loading the coordinates. 
+
+```{r load coords 2022 }
+
+# reference to see column names in true_class dfs
+#true_class <- mod_df[, (names(mod_df) %in% c("x", "y", "coord_code", "true_class", "NDMI_anomaly"))]
+
+true_class_path_2022 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230927_modeling_df/true_class/true_class_2022.csv"
+
+# first two columns are x and y 
+
+coords_df_2022 <- data.table::fread(true_class_path_2022, select = c(1,2), header = TRUE)
+
+glimpse(coords_df_2022)
+
+# Rows:  10,432,546
+# Columns: 2
+# x
+# y
+
+```
+
+# Make into one df 2022
+
+```{r new df with coords 2022 }
+
+SHAPdf_coords_2022 = cbind(coords_df_2022, shap_df_2022)
+
+glimpse(SHAPdf_coords_2022)
+
+# Rows: 10,406,171
+# Columns: 3
+# x
+# y
+# ET_1year_2022
+
+```
+
+# Join all
+
+```{r join all }
+
+list_dfs = list(SHAPdf_coords_2018, SHAPdf_coords_2019, SHAPdf_coords_2020, SHAPdf_coords_2021, SHAPdf_coords_2022)
+
+tic("merge dfs")
+merged_SHAPdf = plyr::join_all(dfs = list_dfs, type = "full")
+
+toc()
+
+tictoc::tic.clearlog()
+
+# merge dfs: 161.31 sec elapsed
+
+glimpse(merged_SHAPdf)
+
+# Rows: 10,439,063
+# Columns: 7
+
+summary(merged_SHAPdf)
+
+```
+
+# Mean of SHAP values
+
+```{r mean shap }
+
+merged_SHAPdf$mean_SHAP = rowMeans(subset(merged_SHAPdf, select = c("2018", "2019", "2020", "2021", "2022")),
+                                          na.rm = TRUE)
+
+
+# save this df 
+write.csv(merged_SHAPdf, "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/ET_1year_mean_SHAP_df.csv", row.names = FALSE)
+
+glimpse(merged_SHAPdf)
+# Rows: 10,439,000
+# Columns: 8
+
+colnames(merged_SHAPdf)
+# [1] "x"         "y"         "2018"      "2019"      "2020"      "2021"      "2022"      "mean_SHAP"
+
+TEST = read.csv("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/ET_1year_mean_SHAP_df.csv")
+
+# Rows: 10,439,063
+# Columns: 8
+
+```
+
+# Convert to raster TEST
+
+```{r convert to raster }
+
+shap_df = merged_SHAPdf[, c("x", "y", "mean_SHAP")]
+
+SHAP_rast = terra::rast(shap_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+
+# the reason I converted to lonlat is to include the scalebar (it didnt work with the other projection)
+SHAP_rast_lonlat = terra::project(x = SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+
+# convert to raster::raster for plotting
+SHAP_r = raster::raster(SHAP_rast_lonlat)
+
+raster::plot(SHAP_r, colNA = "lightgray", col = colorRampPalette(c("#020d47", "#002ae7", "#39b5ff", "#00ff9b", "#fcf599", "#ff980c", "#F36802", "#F82602", "#7F0000"))(255),
+             legend.args = list(text = "SHAP value", line = 0.5, cex = 1, adj = 0.25))
+
+minValue(SHAP_r) # -0.4069258
+maxValue(SHAP_r) # 0.2935002
+
+# it works, cool 
+
+```

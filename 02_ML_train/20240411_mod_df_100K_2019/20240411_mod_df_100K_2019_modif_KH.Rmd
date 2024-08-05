@@ -1,0 +1,246 @@
+---
+title: "100K df (2019)"
+author: "Stenka Vulova"
+date: '2024-04-11'
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+#library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+library(rgeos)
+
+library(tools)
+
+```
+
+# Load df 
+
+```{r load df }
+
+# load the balanced df
+mod_df = readRDS("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230927_modeling_df/all/mod_df_2019.rds")
+
+glimpse(mod_df)
+
+summary(mod_df)
+
+#Rows: 10,437,444
+#Columns: 45
+
+#table(mod_df$NDMI_classes)
+
+#  damaged no_change 
+#  5128392   5128392
+
+```
+
+## Load static data
+
+Static predictors co-registered to NDMI.  
+
+```{r Load static data }
+
+examp_rast = terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED_DATA/20230926_data_proj/Static_data_proj/broadleaf_proj.tif")
+
+terra::plot(examp_rast, col=colorRampPalette(c("#460000", "#930c0c", "#ff2100", "#ff980c",
+                                 "#fcf599", "#00ff9b", "#39b5ff","#002ae7",
+                                "#020d47"))(255))
+
+examp_rast
+
+```
+
+```{r convert the raster }
+
+mod_df_sub <- mod_df[, c("x", "y", "NDMI_anomaly")]
+
+mod_rast = terra::rast(mod_df_sub, type = "xyz", crs = crs(examp_rast) )
+
+mod_rast
+
+terra::plot(mod_rast, col=colorRampPalette(c("#460000", "#930c0c", "#ff2100", "#ff980c",
+                                 "#fcf599", "#00ff9b", "#39b5ff","#002ae7",
+                                "#020d47"))(255))
+
+# it works :-) 
+```
+
+# Add class column
+
+```{r create new column }
+
+tic("assign classes to NDMI")
+
+# Create a mapping dictionary (Python code for reference only)
+#category_mapping = {"no_change": 0, "damaged": 1}
+
+# Create a new column 'true_class' based on 'NDMI_anomaly'
+mod_df$true_class <- ifelse(mod_df$NDMI_anomaly <= -10, 1, 0)
+
+# Note that when working with binary classification problems, especially imbalanced problems,
+# it is important that the majority class is assigned to class 0 and the minority class is assigned to class 1.
+
+
+toc()
+
+tictoc::tic.clearlog()
+
+# assign classes to NDMI: 2.46 sec elapsed
+
+#head(mod_df)
+
+table(mod_df$true_class)
+
+#         0       1 
+#5309052 5128392 
+
+head(mod_df)
+
+```
+
+# Add row numbering column
+
+This column will be used to code for specific coordinates. 
+I will also save this information in a csv to later link these codes to actual coordinates. 
+
+```{r add row numbering column }
+
+# Add a new column with row numbers
+mod_df <- mod_df %>% 
+  mutate(coord_code = row_number())
+
+# check how many unique coord_code values there are
+
+length(unique(mod_df$coord_code))
+# 10437444
+
+nrow(mod_df)
+
+# matches, looks good 
+
+
+
+```
+
+# Keep certain columns 
+
+```{r keep certain columns }
+
+# keep only a few needed columns 
+true_class <- mod_df[, (names(mod_df) %in% c("x", "y", "coord_code", "true_class", "NDMI_anomaly"))]
+
+# Check the dimensions
+dim(true_class)  # Output: [1] 10437444       4
+
+# Save as a .csv
+write.csv(true_class, file = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230927_modeling_df/true_class/true_class_2019.csv", row.names = FALSE)
+
+#test_true_class = read.csv("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230927_modeling_df/true_class/true_class_2019.csv")
+
+```
+
+# Reduce the df 
+
+100K samples: 50000 samples/ class 
+
+```{r reduce the df }
+
+# Select rows for each class and limit to 1000 samples
+# no_change": 0, "damaged": 1
+
+damaged_samples <- mod_df[mod_df$true_class == 1, ]
+no_change_samples <- mod_df[mod_df$true_class == 0, ]
+
+# Randomly sample 50000 rows from each class
+damaged_samples_subset <- damaged_samples[sample(nrow(damaged_samples), 50000), ]
+no_change_samples_subset <- no_change_samples[sample(nrow(no_change_samples), 50000), ]
+
+# Combine the subsets into a new dataframe
+subset_df <- rbind(damaged_samples_subset, no_change_samples_subset)
+
+table(subset_df$true_class)
+
+#  damaged no_change 
+#      50000       50000 
+
+
+```
+
+# Check if removing 100K dataset works
+
+This time, based on the new column "coord_code."
+
+```{r check if removing 100K df works }
+
+#library(dplyr)
+
+df_filtered <- anti_join(true_class, subset_df, by = "coord_code")
+
+nrow(df_filtered)
+#10337444
+
+nrow(mod_df) - nrow(df_filtered)
+# 100,000
+
+```
+
+
+# Save df 
+
+```{r save df }
+
+write.csv(subset_df, "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20240411_mod_dfs_100K_new/sub_df_100K_
+          2019_new.csv", row.names = FALSE)
+
+#df_test = read.csv("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20240411_mod_dfs_100K_new/sub_df_100K_2019_new.csv")
+
+```
+
+# Re-check with just loaded data
+
+```{r loaded data }
+
+df_100K = read.csv("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20240411_mod_dfs_100K_new/sub_df_100K_2019_new.csv")
+
+true_class = read.csv("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230927_modeling_df/true_class/true_class_2019.csv")
+
+df_filtered <- anti_join(true_class, df_100K, by = "coord_code")
+
+nrow(df_filtered)
+#10337444
+
+nrow(true_class) - nrow(df_filtered)
+# 100,000
+
+# it works! 
+
+```
+

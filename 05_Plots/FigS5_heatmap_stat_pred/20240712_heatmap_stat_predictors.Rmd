@@ -1,0 +1,132 @@
+---
+title: "Heatmap_CliWaC"
+author: "Katharina Horn"
+date: "2024-07-12"
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+#library(rgdal)
+library(lubridate)
+#library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+#library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(ggpubr)  # plotting multiple maps together
+library(patchwork) # to use plot_spacer()
+library(cowplot) # to use plot_grid()
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+
+library(tools)
+library(tibble)
+
+library(scales)
+
+```
+
+```{r Load static predictors}
+
+agriculture <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/agprox_proj.tif")
+names(agriculture) <- "agriculture"
+aspect <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/aspect_proj.tif")
+names(aspect) <- "aspect"
+bdod <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/bdod_proj.tif")
+names(bdod) <- "bdod"
+broadleaf <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/broadleaf_proj.tif")
+names(broadleaf) <- "broadleaf"
+canop <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/canop_proj.tif")
+names(canop) <- "canopy height"
+cec <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/cec_proj.tif")
+names(cec) <- "cec"
+cfvo <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/cfvo_proj.tif")
+names(cfvo) <- "cfvo"
+clay <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/clay_proj.tif")
+names(clay) <- "clay"
+DEM <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/DEM_proj.tif")
+names(DEM) <- "elevation"
+forprox <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/forprox_proj.tif")
+names(forprox) <- "distance to forest edge"
+NFK <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/NFK_proj.tif")
+names(NFK) <- "NFK"
+nitrogen <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/nitrogen_proj.tif")
+names(nitrogen) <- "nitrogen"
+ocd <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/ocd_proj.tif")
+names(ocd) <- "ocd"
+ocs <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/ocs_proj.tif")
+names(ocs) <- "ocs"
+sand <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/sand_proj.tif")
+names(sand) <- "sand"
+silt <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/silt_proj.tif")
+names(silt) <- "silt"
+slope <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/slope_proj.tif")
+names(slope) <- "slope"
+soc <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/soc_proj.tif")
+names(soc) <- "soc"
+tcd <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/tcd_proj.tif")
+names(tcd) <- "tcd"
+TWI <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/TWI_proj.tif")
+names(TWI) <- "TWI"
+waterprox <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/waterprox_proj.tif")
+names(waterprox) <- "distance to water bodies"
+
+```
+
+```{r stack rasters & compute correlations}
+stack <- c(agriculture, aspect, bdod, broadleaf, canop, cec, cfvo, clay, DEM, forprox, NFK, nitrogen,
+           ocd, ocs, sand, silt, slope, soc, tcd, TWI, waterprox)
+
+corr_df = as.data.frame(stats::cor(as.matrix(stack), use = "pairwise.complete.obs", method = "pearson"))
+
+#corr_df$Predictor = rownames(corr_df)
+
+corr_df
+
+# save as .csv
+write.table(corr_df, "D:/Nextcloud/Documents/CliWaC/05_RESULTS/correlations/stat_pred_correlations.csv", col.names = NA,
+          row.names = TRUE, dec = ".", sep = ";")
+
+```
+
+
+```{r Heatplot}
+
+# Katharina's solution
+# Create correlation matrix plot
+library(ggcorrplot)
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/correlations/heatplot_static_corr.png", height = 12, width = 16, units = "cm", res = 300)
+ggcorrplot(corr_df, hc.order = FALSE, type = "lower",
+           outline.col = "white",
+           ggtheme = theme_void() +
+             theme(legend.title = element_text(size = 8)), 
+           colors = c("#6D9EC1", "white", "#E46726"),
+           lab = TRUE, show.diag=FALSE,
+           lab_size = 2, 
+           legend.title = "Pearson's Correlation\n", tl.cex=8)
+dev.off()
+
+
+```
+

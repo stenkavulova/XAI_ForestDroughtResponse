@@ -1,0 +1,319 @@
+---
+title: "Density plots (all years)"
+author: "Stenka Vulova"
+date: '2024-05-13'
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+#library(raster)
+library(terra)
+library(rgdal)
+library(lubridate)
+#library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+#library(rgeos)
+
+#library(grid)
+#library(spatstat)
+#library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+#library(ggspatial)
+#library(geobuffer)
+#library(rgeos)
+
+library(tools)
+
+library(data.table)
+
+library(colorspace)
+
+```
+
+# 2018
+
+# Load the modeled class df 2018
+
+```{r load mod class df 2018 }
+
+##  fread() function from the data.table package is known for its efficiency in reading large datasets. 
+
+tic("load modeled class")
+
+csv_mod_2018 <- "D:/Stenka_Cliwac/Topic_1//05_RESULTS/20240415_SHAP.df_NEW/X_all_2018_SHAP.csv"
+
+# Use fread() to read only the first column
+# first column is the modeled class
+modclass_2018 <- data.table::fread(csv_mod_2018, select = 1, header = TRUE)
+
+toc()
+
+tictoc::tic.clearlog()
+# load modeled class: 72.75 sec elapsed
+
+# Print the first few rows of the first column
+head(modclass_2018)
+
+# same length (number of rows) as true class - check
+
+# change the column name
+names(modclass_2018)[1] <- "mod_class"
+
+```
+
+## Load the NDMI anomaly 2018 
+
+```{r NDMI anomaly 2018 }
+
+mod_df_2018 = readRDS("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230927_modeling_df/all/mod_df_2018.rds")
+
+modclass_2018$NDMI_anomaly = mod_df_2018$NDMI_anomaly
+
+modclass_2018$Year = "2018"
+
+```
+
+# 2019
+
+# Load the modeled class df 2019
+
+```{r load mod class df 2019 }
+
+##  fread() function from the data.table package is known for its efficiency in reading large datasets. 
+
+tic("load modeled class")
+
+csv_mod_2019 <- "D:/Stenka_Cliwac/Topic_1//05_RESULTS/20240415_SHAP.df_NEW/X_all_2019_SHAP.csv"
+
+# Use fread() to read only the first column
+# first column is the modeled class
+modclass_2019 <- data.table::fread(csv_mod_2019, select = 1, header = TRUE)
+
+toc()
+
+tictoc::tic.clearlog()
+# load modeled class: 72.75 sec elapsed
+
+# Print the first few rows of the first column
+head(modclass_2019)
+
+# same length (number of rows) as true class - check
+
+# change the column name
+names(modclass_2019)[1] <- "mod_class"
+
+```
+
+## Load the NDMI anomaly 2019 
+
+```{r NDMI anomaly 2019 }
+
+mod_df_2019 = readRDS("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230927_modeling_df/all/mod_df_2019.rds")
+
+modclass_2019$NDMI_anomaly = mod_df_2019$NDMI_anomaly
+
+modclass_2019$Year = "2019"
+
+```
+
+# 2020
+
+# Load the modeled class df 2020
+
+```{r load mod class df 2020 }
+
+##  fread() function from the data.table package is known for its efficiency in reading large datasets. 
+
+tic("load modeled class")
+
+csv_mod_2020 <- "D:/Stenka_Cliwac/Topic_1//05_RESULTS/20240415_SHAP.df_NEW/X_all_2020_SHAP.csv"
+
+# Use fread() to read only the first column
+# first column is the modeled class
+modclass_2020 <- data.table::fread(csv_mod_2020, select = 1, header = TRUE)
+
+toc()
+
+tictoc::tic.clearlog()
+# load modeled class: 72.75 sec elapsed
+
+# Print the first few rows of the first column
+head(modclass_2020)
+
+# change the column name
+names(modclass_2020)[1] <- "mod_class"
+
+```
+
+## Load the NDMI anomaly 2020 
+
+```{r NDMI anomaly 2020 }
+
+mod_df_2020 = readRDS("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230927_modeling_df/all/mod_df_2020.rds")
+
+modclass_2020$NDMI_anomaly = mod_df_2020$NDMI_anomaly
+
+modclass_2020$Year = "2020"
+
+```
+
+# 2021
+
+# Load the modeled class df 2021
+
+```{r load mod class df 2021 }
+
+##  fread() function from the data.table package is known for its efficiency in reading large datasets. 
+
+tic("load modeled class")
+
+csv_mod_2021 <- "D:/Stenka_Cliwac/Topic_1//05_RESULTS/20240415_SHAP.df_NEW/X_all_2021_SHAP.csv"
+
+# Use fread() to read only the first column
+# first column is the modeled class
+modclass_2021 <- data.table::fread(csv_mod_2021, select = 1, header = TRUE)
+
+toc()
+
+tictoc::tic.clearlog()
+# load modeled class: 72.75 sec elapsed
+
+# Print the first few rows of the first column
+head(modclass_2021)
+
+# same length (number of rows) as true class - check
+
+# change the column name
+names(modclass_2021)[1] <- "mod_class"
+
+```
+
+## Load the NDMI anomaly 2021 
+
+```{r NDMI anomaly 2021 }
+
+mod_df_2021 = readRDS("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230927_modeling_df/all/mod_df_2021.rds")
+
+modclass_2021$NDMI_anomaly = mod_df_2021$NDMI_anomaly
+
+modclass_2021$Year = "2021"
+
+```
+
+# 2022
+
+# Load the modeled class df 2022
+
+```{r load mod class df 2022 }
+
+##  fread() function from the data.table package is known for its efficiency in reading large datasets. 
+
+tic("load modeled class")
+
+csv_mod_2022 <- "D:/Stenka_Cliwac/Topic_1//05_RESULTS/20240415_SHAP.df_NEW/X_all_2022_SHAP.csv"
+
+# Use fread() to read only the first column
+# first column is the modeled class
+modclass_2022 <- data.table::fread(csv_mod_2022, select = 1, header = TRUE)
+
+toc()
+
+tictoc::tic.clearlog()
+# load modeled class: 72.75 sec elapsed
+
+# Print the first few rows of the first column
+head(modclass_2022)
+
+# same length (number of rows) as true class - check
+
+# change the column name
+names(modclass_2022)[1] <- "mod_class"
+
+```
+
+## Load the NDMI anomaly 2022 
+
+```{r NDMI anomaly 2022 }
+
+mod_df_2022 = readRDS("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230927_modeling_df/all/mod_df_2022.rds")
+
+modclass_2022$NDMI_anomaly = mod_df_2022$NDMI_anomaly
+
+modclass_2022$Year = "2022"
+
+```
+
+# Remove data 
+
+from the environment 
+
+```{r test Rm }
+
+rm(mod_df_2018, mod_df_2019, mod_df_2020, mod_df_2021, mod_df_2022)
+
+```
+
+# Bind together 
+
+stack the dfs on top of each other
+
+```{r bind}
+
+plot_df = rbind(modclass_2018, modclass_2019, modclass_2020, modclass_2021, modclass_2022)
+
+glimpse(plot_df)
+
+# Rows: 51,335,873
+# Columns: 3
+
+plot_df$mod_class = factor(plot_df$mod_class, levels = c(0,1), labels = c("no change", "damaged"))
+
+```
+
+# plot
+
+```{r plot }
+
+#hcl_palettes("Qualitative", n = 2, plot = TRUE)
+
+# df_all['NDMI_classes'] = df_all['NDMI_anomaly'].apply(lambda x: 'damaged' if x <= -10 else 'no_change')
+
+density_plot = 
+ggplot(data = plot_df, aes(NDMI_anomaly, fill = mod_class)) +
+  geom_density(alpha = 0.6)+
+  xlim(-100,100)+
+  theme_bw()+
+  geom_vline(xintercept = -10, colour = "red", linetype = "dashed", size = 0.8)+
+  xlab("NDMI anomaly (%)")+
+  ylab("Density") +
+  facet_wrap(~Year, ncol = 2) +
+  scale_fill_discrete_qualitative(name = "Modeled class", palette = "Harmonic", order = c(2,1))+
+    theme_bw()+ 
+    theme(axis.text.y = element_text(size = 15),
+        axis.text.x = element_text(size = 15),
+        axis.title = element_text(size = 20),
+        strip.text = element_text(size = 20),
+        legend.text = element_text(size = 15),
+        legend.title = element_text(size = 17)) 
+
+density_plot
+
+ggsave('D:/Stenka_Cliwac/Topic_1/06_R_SCRIPTS/20240513_density_plots/density_plot_allyears.pdf', plot=density_plot, device='pdf', dpi=300, width=12, height=15 )
+
+```

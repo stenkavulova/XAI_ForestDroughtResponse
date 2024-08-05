@@ -1,0 +1,259 @@
+---
+title: 'Fig 5: Mean SHAP values of five most important predictors'
+author: "Katharina Horn"
+date: "2024-05-13"
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+library(rgeos)
+
+library(cowplot) # get_legend() function
+library(ggpubr) # as_ggplot() function
+
+library(tools)
+library(tibble)
+
+```
+
+# Import Brandenburg and Berlin border
+
+Keeping Berlin in the plots.
+
+``` {r Load Berlin-Brandenburg border}
+
+bb <- terra::vect("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border_3035.shp") # for cropping of data frames
+
+# Load as sf object
+bb_st <- st_read("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border_3035.shp") # for mapping
+
+```
+
+## Load five predictor data frames
+
+
+```{r load data frames of mean SHAP values of five most important predictors}
+
+broadleaf_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/broadleaf_perc_mean_SHAP_df.csv"
+canopy_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/canopyheight_mean_SHAP_df.csv"
+ET_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/ET_1year_mean_SHAP_df.csv"
+SPEI_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/SPEI_sameyear_mean_SHAP_df.csv"
+TCD_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/TCD_mean_SHAP_df.csv"
+
+# first two columns are x and y ´
+# 8th column is mean_shap across all years
+
+broadleaf_df <- data.table::fread(broadleaf_path, select = c(1,2,8), header = TRUE)
+canopy_df <- data.table::fread(canopy_path, select = c(1,2,8), header = TRUE)
+ET_df <- data.table::fread(ET_path, select = c(1,2,8), header = TRUE)
+SPEI_df <- data.table::fread(SPEI_path, select = c(1,2,8), header = TRUE)
+TCD_df <- data.table::fread(TCD_path, select = c(1,2,8), header = TRUE)
+
+glimpse(broadleaf_df)
+# looks fine
+
+
+```
+
+## Raster conversion is not needed, since I am plotting with ggplot() and therefore need data frames instead of raster files. 
+
+```{r convert to raster }
+
+# broadleaf_SHAP_rast = terra::rast(broadleaf_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+# canopy_SHAP_rast = terra::rast(canopy_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+# ET_SHAP_rast = terra::rast(ET_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+# SPEI_SHAP_rast = terra::rast(SPEI_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+# TCD_SHAP_rast = terra::rast(TCD_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+# 
+# # the reason I converted to lonlat is to include the scalebar (it didnt work with the other projection)
+# broadleaf_SHAP_rast_lonlat = terra::project(x = broadleaf_SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+# canopy_SHAP_rast_lonlat = terra::project(x = canopy_SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+# ET_SHAP_rast_lonlat = terra::project(x = ET_SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+# SPEI_SHAP_rast_lonlat = terra::project(x = SPEI_SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+# TCD_SHAP_rast_lonlat = terra::project(x = TCD_SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+
+
+
+# # convert to raster::raster for plotting
+# SHAP_r = raster::raster(SHAP_rast_lonlat)
+# 
+# raster::plot(SHAP_r, colNA = "lightgray", col=colorRampPalette(c("#460000", "#930c0c", "#ff2100", "#ff980c",
+#                                  "#fcf599", "#00ff9b", "#39b5ff","#002ae7",
+#                                 "#020d47"))(255),
+#              legend.args = list(text = "SHAP value", line = 0.5, cex = 1, adj = 0.25))
+# 
+# minValue(SHAP_r) # -0.6971202
+# maxValue(SHAP_r) # 1.486262
+
+
+```
+
+# Define color scale
+
+```{r Define color scale}
+
+colors <- colorRampPalette(c("#020d47", "#002ae7", "#39b5ff", "#00ff9b", "#fcf599", "#ff980c", "#F36802", "#F82602", "#7F0000"))(255)
+
+```
+
+# Plot mean SHAP of all five predictors
+
+```{r Plot mean SHAP of all five predictors separately}
+
+# Plot TCD_SHAP
+color_limits_TCD <- c(-1, 1)
+# used for tcd and broadleaf_perc
+
+
+# Plot SPEI_SHAP
+color_limits_SPEI <- c(-0.3, 0.3)
+# used for SPEI, ET, and canopyheight
+
+
+TCD_SHAP <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = mean_SHAP), data = TCD_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits_TCD, guide = "colorbar", breaks = c(color_limits_TCD[1], 0, color_limits_TCD[2]), oob = scales::squish) +    # set legend colours
+  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal", legend.position = "bottom") +
+  theme_void() +
+  theme(legend.position = "bottom")                                                           # no theme
+
+# Plot broadleaf_SHAP
+broadleaf_SHAP <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = mean_SHAP), data = broadleaf_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits_TCD, guide = "colorbar", breaks = c(color_limits_TCD[1], 0, color_limits_TCD[2]), oob = scales::squish) +    labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal") +
+  theme_void() +
+  theme(legend.position = "bottom")                                                           # no theme
+
+
+# Plot canopy_SHAP
+canopy_SHAP <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = mean_SHAP), data = canopy_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits_SPEI, guide = "colorbar", breaks = c(color_limits_SPEI[1], 0, color_limits_SPEI[2]), oob = scales::squish) +                            # set legend colours  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal") +
+  theme_void() +
+  theme(legend.position = "bottom")                                                           # no theme
+
+# Plot SPEI_SHAP
+SPEI_SHAP <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = mean_SHAP), data = SPEI_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits_SPEI, guide = "colorbar", breaks = c(color_limits_SPEI[1], 0, color_limits_SPEI[2]), oob = scales::squish) +                            # set legend colours  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal") +
+  theme_void()    +
+  theme(legend.position = "bottom")                                                        # no theme
+
+# Plot ET_SHAP
+ET_SHAP <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = mean_SHAP), data = ET_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits_SPEI, guide = "colorbar", breaks = c(color_limits_SPEI[1], 0, color_limits_SPEI[2]), oob = scales::squish) +                            # set legend colours
+  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme_void() +                                                           # no theme
+  theme(legend.direction = "horizontal", legend.box = "horizontal") +
+  theme(legend.position = "bottom")
+
+```
+
+# Get legend of the plots
+
+I can extract a legend from one of the plots since all of them are based on the same min() and max() values
+for each year. 
+
+```{r Get legend of one of the plots to use as joint legend for all plots}
+
+leg1 <- get_legend(TCD_SHAP)
+leg2 <- get_legend(SPEI_SHAP)
+
+# Convert to a ggplot object
+leg1 <- as_ggplot(leg1)
+leg2 <- as_ggplot(leg2)
+
+```
+
+# Arrange and export plots
+
+In Inkscape, I will add the label headings (aligning did not work out well within ggarrange() and I will add the scales as well. 
+
+```{r Arrange resulting plots}
+
+# Create the layout
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240425_mostimp_SHAP_avg_maps/predictors_avgSHAP_map_new.png", width = 17.5, height = 12, units = "cm", res = 300)
+predictors_avgSHAP <- ggarrange(
+  ggarrange(TCD_SHAP, broadleaf_SHAP, ncol = 3, nrow = 1, legend = "none"),
+  ggarrange(canopy_SHAP, SPEI_SHAP, ET_SHAP, ncol = 3, nrow = 1, legend = "none"),
+  ncol = 1, nrow = 2
+)
+
+predictors_avgSHAP
+
+dev.off()
+
+
+```
+# Export legends
+
+Lastly, I am saving the legends as png files so that I can combine everything in Inkscape. 
+
+```{r Save legends as png files}
+
+# Export legends as png files for arranging in inkscape
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240425_mostimp_SHAP_avg_maps/leg1_TCD.png", width = 5.9, height = 2, units = "cm", res = 300)
+leg1
+dev.off()
+
+# Export legends as png files for arranging in inkscape
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240425_mostimp_SHAP_avg_maps/leg2_SPEI.png", width = 5.9, height = 2, units = "cm", res = 300)
+leg2
+dev.off()
+
+# I am 
+```

@@ -1,0 +1,281 @@
+---
+title: "Percentage of response variable"
+output: html_document
+date: "2024-07-11"
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+#library(rgdal)
+library(lubridate)
+#library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+#library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+
+library(tools)
+library(tibble)
+
+```
+
+```{r import SHAP df names }
+
+# column names of SHAP dfs
+cols_SHAPdf = read.table("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/colnames_SHAPdf.csv", sep = ",", header = FALSE)
+
+```
+
+
+
+# Select a predictor
+
+Select which predictor you want to analyze (and get what column # it is in SHAP dfs)
+
+```{r select the top predictors }
+
+pred_name = "mod_class"
+
+# Match the names in pred_name with the values in the "V1" column of cols_SHAPdf
+matched_rows <- match(pred_name, cols_SHAPdf$V1, nomatch = 0)
+
+# Filter out the matched row numbers
+matched_rows <- matched_rows[matched_rows > 0]
+
+# Print the list of row numbers
+print(matched_rows) # 20
+
+# 1: mod_class
+
+# looks good. 
+
+```
+
+# Load the SHAP df 2018 
+
+```{r import the 2018 df }
+
+tic("load 2018 SHAP df")
+
+shap_df_path_2018 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/X_all_2018_SHAP.csv"
+
+# read only a selected column name e.g. predictor
+shap_df_2018 <- data.table::fread(shap_df_path_2018, select = matched_rows, header = TRUE)
+
+toc()
+
+tic.clearlog()
+# load 2018 SHAP df: 3.23 sec elapsed
+
+glimpse(shap_df_2018)
+# Rows: 10,406,171
+#Columns: 1
+
+# assign the column name as the selected predictor 
+colnames(shap_df_2018) = "2018"
+
+
+# How much percent is damaged / no change ?
+total_count_2018 <- nrow(shap_df_2018)
+count_0_2018 <- sum(shap_df_2018$`2018` == 0)
+count_1_2018 <- sum(shap_df_2018$`2018` == 1)
+
+# Calculate percentages
+percent_0_2018 <- (count_0_2018 / total_count_2018) * 100
+percent_1_2018 <- (count_1_2018 / total_count_2018) * 100
+
+# Round the percentages to 1 decimal place
+percent_0_2018 <- round(percent_0_2018, 1)
+percent_1_2018 <- round(percent_1_2018, 1)
+
+# Print the results
+total_count_2018 # 10,406,171
+percent_0_2018 # 54.8 %
+percent_1_2018 # 45.2 %
+
+```
+
+```{r import the 2019 df }
+
+tic("load 2019 SHAP df")
+
+shap_df_path_2019 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/X_all_2019_SHAP.csv"
+
+# read only a selected column name e.g. predictor
+shap_df_2019 <- data.table::fread(shap_df_path_2019, select = matched_rows, header = TRUE)
+
+toc()
+
+tic.clearlog()
+# load 2019 SHAP df: 46.86 sec elapsed
+
+glimpse(shap_df_2019)
+# Rows: 10,437,444
+#Columns: 1
+
+colnames(shap_df_2019) = "2019"
+
+# How much percent is damaged / no change ?
+total_count_2019 <- nrow(shap_df_2019)
+count_0_2019 <- sum(shap_df_2019$`2019` == 0)
+count_1_2019 <- sum(shap_df_2019$`2019` == 1)
+
+# Calculate percentages
+percent_0_2019 <- (count_0_2019 / total_count_2019) * 100
+percent_1_2019 <- (count_1_2019 / total_count_2019) * 100
+
+# Round the percentages to 1 decimal place
+percent_0_2019 <- round(percent_0_2019, 1)
+percent_1_2019 <- round(percent_1_2019, 1)
+
+# Print the results
+total_count_2019 # 10,437,444
+percent_0_2019 # 52.2 %
+percent_1_2019 # 47.8 %
+
+```
+
+# Load the SHAP df 2020 
+
+```{r import the 2020 df }
+
+tic("load 2020 SHAP df")
+
+shap_df_path_2020 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/X_all_2020_SHAP.csv"
+
+# read only a selected column name e.g. predictor
+shap_df_2020 <- data.table::fread(shap_df_path_2020, select = matched_rows, header = TRUE)
+
+toc()
+
+tic.clearlog()
+# load 2020 SHAP df: 3.23 sec elapsed
+
+glimpse(shap_df_2020)
+# Rows: 10,434,985
+#Columns: 1
+
+colnames(shap_df_2020) = "2020"
+
+# How much percent is damaged / no change ?
+total_count_2020 <- nrow(shap_df_2020)
+count_0_2020 <- sum(shap_df_2020$`2020` == 0)
+count_1_2020 <- sum(shap_df_2020$`2020` == 1)
+
+# Calculate percentages
+percent_0_2020 <- (count_0_2020 / total_count_2020) * 100
+percent_1_2020 <- (count_1_2020 / total_count_2020) * 100
+
+# Round the percentages to 1 decimal place
+percent_0_2020 <- round(percent_0_2020, 1)
+percent_1_2020 <- round(percent_1_2020, 1)
+
+# Print the results
+total_count_2020 # 10,434,985
+percent_0_2020 # 49.6 %
+percent_1_2020 # 50.4 %
+
+```
+
+```{r import the 2021 df }
+
+tic("load 2021 SHAP df")
+
+shap_df_path_2021 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/X_all_2021_SHAP.csv"
+
+# read only a selected column name e.g. predictor
+shap_df_2021 <- data.table::fread(shap_df_path_2021, select = matched_rows, header = TRUE)
+
+toc()
+
+tic.clearlog()
+# load 2021 SHAP df: 3.23 sec elapsed
+
+glimpse(shap_df_2021)
+# Rows: 9,624,727
+#Columns: 1
+
+colnames(shap_df_2021) = "2021"
+
+
+# How much percent is damaged / no change ?
+total_count_2021 <- nrow(shap_df_2021)
+count_0_2021 <- sum(shap_df_2021$`2021` == 0)
+count_1_2021 <- sum(shap_df_2021$`2021` == 1)
+
+# Calculate percentages
+percent_0_2021 <- (count_0_2021 / total_count_2021) * 100
+percent_1_2021 <- (count_1_2021 / total_count_2021) * 100
+
+# Round the percentages to 1 decimal place
+percent_0_2021 <- round(percent_0_2021, 1)
+percent_1_2021 <- round(percent_1_2021, 1)
+
+# Print the results
+total_count_2021 # 9,624,727
+percent_0_2021 # 65.1%
+percent_1_2021 # 34.9%
+
+```
+# Load the SHAP df 2022 
+
+```{r import the 2022 df }
+
+tic("load 2022 SHAP df")
+
+shap_df_path_2022 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/X_all_2022_SHAP.csv"
+
+# read only a selected column name e.g. predictor
+shap_df_2022 <- data.table::fread(shap_df_path_2022, select = matched_rows, header = TRUE)
+
+toc()
+
+tic.clearlog()
+# load 2022 SHAP df: 3.23 sec elapsed
+
+glimpse(shap_df_2022)
+# Rows: 10,432,546
+#Columns: 1
+
+colnames(shap_df_2022) = "2022"
+
+# How much percent is damaged / no change ?
+total_count_2022 <- nrow(shap_df_2022)
+count_0_2022 <- sum(shap_df_2022$`2022` == 0)
+count_1_2022 <- sum(shap_df_2022$`2022` == 1)
+
+# Calculate percentages
+percent_0_2022 <- (count_0_2022 / total_count_2022) * 100
+percent_1_2022 <- (count_1_2022 / total_count_2022) * 100
+
+# Round the percentages to 1 decimal place
+percent_0_2022 <- round(percent_0_2022, 1)
+percent_1_2022 <- round(percent_1_2022, 1)
+
+# Print the results
+total_count_2022 # 10,432,546
+percent_0_2022 # 52.7%
+percent_1_2022 # 47.3%
+
+```

@@ -1,0 +1,324 @@
+---
+title: "NDMI_anomaly mapping"
+author: "Katharina Horn"
+date: '2024-05-10'
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(ggpubr)  # plotting multiple maps together
+library(patchwork) # to use plot_spacer()
+library(cowplot) # to use plot_grid()
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+library(rgeos)
+
+library(tools)
+library(tibble)
+
+library(scales)
+
+```
+
+
+```{r Load NDMI anomaly rasters}
+
+NDMI_2018 <- terra::rast("D:/Katharina/CliWaC/03_PROCESSED DATA/Vegetation/NDMI/Anomaly Rasters with TCD/NDMI_2018_anom_forest.tif")
+NDMI_2019 <- terra::rast("D:/Katharina/CliWaC/03_PROCESSED DATA/Vegetation/NDMI/Anomaly Rasters with TCD/NDMI_2019_anom_forest.tif")
+NDMI_2020 <- terra::rast("D:/Katharina/CliWaC/03_PROCESSED DATA/Vegetation/NDMI/Anomaly Rasters with TCD/NDMI_2020_anom_forest.tif")
+NDMI_2021 <- terra::rast("D:/Katharina/CliWaC/03_PROCESSED DATA/Vegetation/NDMI/Anomaly Rasters with TCD/NDMI_2021_anom_forest.tif")
+NDMI_2022 <- terra::rast("D:/Katharina/CliWaC/03_PROCESSED DATA/Vegetation/NDMI/Anomaly Rasters with TCD/NDMI_2022_anom_forest.tif")
+
+#NDMI_stack <- raster::stack(NDMI_2018, NDMI_2019, NDMI_2020, NDMI_2021, NDMI_2022)
+#NDMI_stack <- c(NDMI_2018, NDMI_2019, NDMI_2020, NDMI_2021, NDMI_2022)
+#names(NDMI_stack) <- c("NDMI_2018", "NDMI_2019", "NDMI_2020", "NDMI_2021", "NDMI_2022")
+#NDMI_stack 
+
+```
+
+# Reproject Berlin-Brandenburg border
+
+No need to redo this, since I have already run this part of code once. 
+
+```{r Reproject Berlin-Brandenburg border}
+
+bb <- terra::vect("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border.shp")
+
+bb_proj <- terra::project(bb, NDMI_2018)
+bb_proj
+plot(bb_proj)
+
+writeVector(bb_proj, "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border_3035.shp")
+
+```
+
+# Load Berlin-Brandenburg border
+
+``` {r Load Berlin-Brandenburg border}
+
+bb <- terra::vect("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border_3035.shp") # for cropping of data frames
+
+# Load as sf object
+bb_st <- st_read("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border_3035.shp") # for mapping
+
+```
+
+```{r Load DEM layer to use for excluding Berlin NDMI values}
+
+dem <- terra::rast("D:/Katharina/CliWaC/03_PROCESSED DATA/Static_data_proj/dem_proj.tif")
+
+dem_proj <- terra::project(dem, NDMI_2018_crop)
+
+```
+
+
+```{r Mask NDMI layers to dem to exclude values within Berlin}
+
+NDMI_2018_mask <- terra::crop(NDMI_2018, dem, mask = TRUE)
+NDMI_2019_mask <- terra::crop(NDMI_2019, dem, mask = TRUE)
+NDMI_2020_mask <- terra::crop(NDMI_2020, dem, mask = TRUE)
+NDMI_2021_mask <- terra::crop(NDMI_2021, dem, mask = TRUE)
+NDMI_2022_mask <- terra::crop(NDMI_2022, dem, mask = TRUE)
+
+
+```
+
+
+```{r crop NDMI layers to BB border}
+
+NDMI_2018_crop <- raster::crop(NDMI_2018_mask, bb)
+NDMI_2019_crop <- raster::crop(NDMI_2019_mask, bb)
+NDMI_2020_crop <- raster::crop(NDMI_2020_mask, bb)
+NDMI_2021_crop <- raster::crop(NDMI_2021_mask, bb)
+NDMI_2022_crop <- raster::crop(NDMI_2022_mask, bb)
+
+```
+
+
+```{r convert rasters into dataframes}
+
+# Convert rasters into data frames
+NDMI_2018_df <- as.data.frame(NDMI_2018_crop, xy = TRUE)
+NDMI_2019_df <- as.data.frame(NDMI_2019_crop, xy = TRUE)
+NDMI_2020_df <- as.data.frame(NDMI_2020_crop, xy = TRUE)
+NDMI_2021_df <- as.data.frame(NDMI_2021_crop, xy = TRUE)
+NDMI_2022_df <- as.data.frame(NDMI_2022_crop, xy = TRUE)
+
+```
+
+
+```{r Create subsets of data frames to exclude outliers}
+
+NDMI_2018_df_filtered <- subset(NDMI_2018_df, AVG >= -30 & AVG <= 30)
+NDMI_2019_df_filtered <- subset(NDMI_2019_df, AVG >= -30 & AVG <= 30)
+NDMI_2020_df_filtered <- subset(NDMI_2020_df, AVG >= -30 & AVG <= 30)
+NDMI_2021_df_filtered <- subset(NDMI_2021_df, AVG >= -30 & AVG <= 30)
+NDMI_2022_df_filtered <- subset(NDMI_2022_df, AVG >= -30 & AVG <= 30)
+
+```
+
+
+```{r Define color scale}
+
+colors <- colorRampPalette(c("#020d47", "#002ae7", "#39b5ff", "#00ff9b", "#fcf599", "#ff980c", "#F36802", "#F82602", "#7F0000"))(255)
+colors_rev <- c("#7F0000", "#F82602", "#F36802", "#ff980c", "#fcf599", "#00ff9b", "#39b5ff", "#002ae7", "#020d47")
+
+```
+
+# Plot NDMI for each year
+
+I decided not to plot the north arrow, because it does not look good on the final map. I will add it with Inkscape afterwards. 
+
+```{r Plot NDMI for all years}
+
+# Plot NDMI_anomaly 2018
+map_ndmi_2018 <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = AVG), data = NDMI_2018_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors_rev, limits = c(-30, 30), oob = scales::squish) +      # set legend colours; oob = scales::squish is setting all values out of the limits to the nearest colour respectively
+  labs(x = NULL, y = NULL, fill = "NDMI anomaly (%)")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                     # add scale bar
+#  annotation_north_arrow(location = "tr", which_north = "grid", height = unit(0.5, "cm"), width = unit(0.35, "cm")) +          # add north arrow
+  theme(legend.position = "right") +
+  theme_void()                                                             # no theme
+
+# Plot NDMI_anomaly 2019
+map_ndmi_2019 <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = AVG), data = NDMI_2019_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors_rev, limits=c(-30,30), oob = scales::squish) +                                  # set legend colours
+  labs(x = NULL, y = NULL, fill = "NDMI anomaly 2019 (%)")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                     # add scale bar
+  theme(legend.position = "right") +
+  theme_void()                                                             # no theme
+
+# Plot NDMI_anomaly 2020
+map_ndmi_2020 <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = AVG), data = NDMI_2020_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors_rev, limits=c(-30,30), oob = scales::squish) +                                  # set legend colours
+  labs(x = NULL, y = NULL, fill = "NDMI anomaly 2020 (%)")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                     # add scale bar
+  theme(legend.position = "right") +
+  theme_void()                                                             # no theme
+
+# Plot NDMI_anomaly 2021
+map_ndmi_2021 <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = AVG), data = NDMI_2021_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors_rev, limits=c(-30,30), oob = scales::squish) +                                  # set legend colours
+  labs(x = NULL, y = NULL, fill = "NDMI anomaly 2021 (%)")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                     # add scale bar
+  theme(legend.position = "right") +
+  theme_void()                                                             # no theme
+
+# Plot NDMI_anomaly 2022
+map_ndmi_2022 <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = AVG), data = NDMI_2022_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors_rev, limits=c(-30,30), oob = scales::squish) +                                  # set legend colours
+  labs(x = NULL, y = NULL, fill = "NDMI anomaly 2022 (%)")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                     # add scale bar
+  theme(legend.position = "right") +
+  theme_void()                                                             # no theme
+
+```
+
+# Check results before plotting everything.
+
+```{r Check resulting plot for 2018}
+
+map_ndmi_2018
+
+# png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240510_NDMI_anomaly/NDMI_2018.png", width = 17.5, height = 12, units = "cm", res = 300)
+# map_ndmi_2018
+# dev.off()
+
+```
+
+# Get legend of one of the plots
+
+I can extract a legend from one of the plots since all of them are based on the same min() and max() values
+for each year. 
+
+```{r Get legend of one of the plots to use as joint legend for all plots}
+
+leg <- get_legend(map_ndmi_2018)
+
+# Convert to a ggplot object
+leg <- as_ggplot(leg)
+leg
+
+```
+
+
+```{r Arrange resulting plots}
+
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240510_NDMI_anomaly/NDMI_anomaly_figure_scale30.png", width = 17.5, height = 12, units = "cm", res = 300)
+
+ndmi <- ggarrange(map_ndmi_2018, map_ndmi_2019, map_ndmi_2020, map_ndmi_2021, map_ndmi_2022, leg,
+          labels = c("2018", "2019", "2020", "2021", "2022", " "), 
+          ncol = 3, nrow = 2, legend = "none")
+ndmi
+
+dev.off()
+
+```
+
+
+## Alternative plotting option based on raster package. (To be continued if needed.)
+
+```{r import Berlin-Brandenburg border }
+# 
+# BB_border = readOGR(dsn = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border",
+#                         layer = "Brandenburg_border")
+# 
+# crs(BB_border)
+# # CRS arguments: +proj=longlat +datum=WGS84 +no_defs 
+# 
+# plot(BB_border)
+# 
+# crs <- crs(NDMI_2018)
+# 
+# # +proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs
+# BB_LAEA = sp::spTransform(BB_border, CRSobj = crs)
+# BB_border = BB_LAEA
+
+
+```
+
+```{r plot NDMI_anomaly}
+
+# png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240510_NDMI_anomaly/NDMI_anomaly_figure.png", width = 17.5, height = 12, units = "cm", res = 300)
+# 
+# # Set outer margins to accommodate legend
+# par(oma = c(0, 0, 0, 3)) # I added this, because otherwise the legend was cut off. 
+# 
+# raster::plot(NDMI_stack_crop, 
+#              col = colorRampPalette(c("#020d47", "#002ae7", "#39b5ff", "#00ff9b", "#fcf599", "#ff980c", "#F36802", "#F82602", "#7F0000"))(255),
+#              zlim=c(-7,5),
+#              legend.args = list(text = "NDMI anomaly", line = 0.5, cex = 1, adj = 0.25),
+#              legend = TRUE, axes = FALSE, box = FALSE)
+# 
+# #plot(mostimp_lonlat, col = c("green3", "magenta3", "gold2", "dodgerblue", "forestgreen"),
+# #     legend.only = TRUE, horizontal = FALSE , smallplot = c(0.87, 0.9, 0.17, 0.86),
+# #     axis.args = list(cex.axis = 1.4), 
+# #	legend.args = list(text = "Most contributing predictor", line = 0.5, cex = 1, adj = 0.25))
+# 
+# # add scalebar 
+# raster::scalebar(d = 50, # distance in km,
+#                  xy = c(11.5, 51.5),
+#                  type = "bar",
+#                  divs = 2,
+#                  below = "km",
+#                  lonlat = TRUE,
+#                  adj = c(0.5, -1.15),
+#                  cex = 1.2)
+# 
+# raster::plot(BB_border, add = TRUE)
+# 
+# 
+# dev.off()
+# 
+# 
+
+
+```

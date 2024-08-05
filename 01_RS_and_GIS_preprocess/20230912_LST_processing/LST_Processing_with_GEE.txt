@@ -1,0 +1,172 @@
+// download MODIS LST 
+
+//################
+// create AOI ####
+//################
+
+// Load the shapefile into a FeatureCollection
+var brandenburg = ee.FeatureCollection('users/katharinahorn/Cliwac/brandenburg');
+
+// Print information about the shapefile
+print(brandenburg);
+
+//add 5km buffer
+var bufferBy = function(size) {
+  return function(feature) {
+    return feature.buffer(size);   
+  };
+};
+
+// Buffer the shapefile by 5 km
+var bufferedShapefile = brandenburg.map(bufferBy(5000));
+// Visualize the buffered shapefile on the map
+Map.addLayer(bufferedShapefile, {}, 'Buffered Shapefile');
+
+// Use the shapefile to define a region of interest
+var roi = bufferedShapefile.geometry();
+//var roi = brandenburg.geometry();
+
+// Load ImageCollection MODIS LST
+var dataset2017 = ee.ImageCollection('MODIS/061/MOD11A2')
+                  .filter(ee.Filter.date('2017-06-01', '2017-08-31')).filterBounds(roi);
+var dataset2018 = ee.ImageCollection('MODIS/061/MOD11A2')
+                  .filter(ee.Filter.date('2018-06-01', '2018-08-31')).filterBounds(roi);
+var dataset2019 = ee.ImageCollection('MODIS/061/MOD11A2')
+                  .filter(ee.Filter.date('2019-06-01', '2019-08-31')).filterBounds(roi);
+var dataset2020 = ee.ImageCollection('MODIS/061/MOD11A2')
+                  .filter(ee.Filter.date('2020-06-01', '2020-08-31')).filterBounds(roi);
+var dataset2021 = ee.ImageCollection('MODIS/061/MOD11A2')
+                  .filter(ee.Filter.date('2021-06-01', '2021-08-31')).filterBounds(roi);
+var dataset2022 = ee.ImageCollection('MODIS/061/MOD11A2')
+                  .filter(ee.Filter.date('2022-06-01', '2022-08-31')).filterBounds(roi);
+
+ 
+                                    
+var landSurfaceTemperature = dataset2022.select('LST_Day_1km');
+var landSurfaceTemperatureVis = {
+  min: 13000.0,
+  max: 16500.0,
+  palette: [
+    '040274', '040281', '0502a3', '0502b8', '0502ce', '0502e6',
+    '0602ff', '235cb1', '307ef3', '269db1', '30c8e2', '32d3ef',
+    '3be285', '3ff38f', '86e26f', '3ae237', 'b5e22e', 'd6e21f',
+    'fff705', 'ffd611', 'ffb613', 'ff8b13', 'ff6e08', 'ff500d',
+    'ff0000', 'de0101', 'c21301', 'a71001', '911003'
+  ],
+};
+
+//show in map canvas
+Map.centerObject(roi, 7); // zoom level for berlin is 9
+Map.addLayer(roi, {color: 'red'}, 'parcels');
+
+print(dataset2021);
+
+/*
+//Map.addLayer(country, {color: 'yellow'}, 'parcels');
+Map.addLayer(
+    landSurfaceTemperature, landSurfaceTemperatureVis,
+    'Land Surface Temperature');
+
+*/
+// create function to crop with table boundaries
+var table_bounds = function(image) {
+  // Crop by table extension
+  return image.clip(roi);
+};
+
+var LSTClipped = landSurfaceTemperature.map(table_bounds);
+
+Map.addLayer(LSTClipped, landSurfaceTemperatureVis, 'LST Clipped');
+
+
+// Number of images in the image collection
+print('Number of images in LSTClipped:', LSTClipped.size());
+
+// Calculate the average value for each image in the LSTClipped ImageCollection
+var calculateAverage = function(image) {
+  var mean = image.reduceRegion({
+    reducer: ee.Reducer.mean(),
+    geometry: roi,
+    scale: 1000 // Adjust the scale as needed
+  });
+  return image.set('mean', mean.get('LST_Day_1km'));
+};
+
+var LSTClippedWithMean = LSTClipped.map(calculateAverage);
+
+// Sort the ImageCollection by the calculated mean value in descending order
+var sortedLST = LSTClippedWithMean.sort('mean', false);
+
+// Get the image with the highest average value
+var highestMeanImage = ee.Image(sortedLST.first());
+
+// Print the image with the highest average value
+print('Image with the highest average value:', highestMeanImage);
+
+
+// Export the image with the highest average value to Google Drive
+Export.image.toDrive({
+  image: highestMeanImage,
+  description: 'HighestMeanLST_2022',
+  folder: 'GEE/LST', // Specify the Google Drive folder where you want to save the image
+  fileNamePrefix: 'HighestMeanLST_2022',
+  region: roi,
+  scale: 1000, // Adjust the scale as needed
+  crs: 'EPSG:3035', // Specify the CRS
+  maxPixels: 1e13 // Specify a suitable maxPixels value
+});
+
+
+/*
+// Get the first image from the LST collection
+var LSTimage = LSTClipped.first();
+
+
+// Get the second image in the LST collection
+// In the toList() method, we pass in the number 2 to specify that 
+// we want to convert the first two images in the collection to a list. 
+// Then we use .get(1) to select the second image in the list, since lists in Earth Engine are 0-indexed. 
+// Finally, we cast the selected image to an ee.Image object.
+
+var LSTimage = ee.Image(LSTClipped.toList(12));
+print(LSTimage);
+
+/*
+// Display the second image
+Map.addLayer(
+  LSTimage, 
+  landSurfaceTemperatureVis, 
+  'Specific Land Surface Temperature Image'
+);
+
+// Get the acquisition date from the image properties
+var acquisitionDate = ee.Date(LSTimage.get('system:time_start'));
+
+// Format the date as yyyy-MM-dd
+var date = acquisitionDate.format('yyyy-MM-dd');
+
+// Define the filename for the exported image
+var filename = ee.String(date).cat('_MODIS_LST').getInfo();
+print(filename);
+
+##################
+
+// Export the image, specifying the CRS, transform, and region.
+Export.image.toDrive({
+  image: LSTClipped(brandenburg),
+  description: 'MODIS/061/MOD11A2',
+  region: brandenburg,
+  crs: 'EPSG: 3035',
+});
+
+
+/*
+// Download ImageCollection
+var batch = require('users/fitoprincipe/geetools:batch');
+
+batch.ImageCollection.toDrive({
+  image: burnedArea, 
+  name: 'MODIS/061/MOD11A1', 
+  region: germany
+});
+*/

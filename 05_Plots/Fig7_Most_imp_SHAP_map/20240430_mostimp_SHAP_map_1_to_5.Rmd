@@ -1,0 +1,307 @@
+---
+title: "SHAP figure (5 most imp)"
+author: "Stenka Vulova"
+date: '2024-04-22'
+output: html_document
+---
+
+This is an example with the year 2018.
+
+In the final figure, please use SHAP values averaged across all years (Katharina).
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+library(rgeos)
+
+library(tools)
+library(tibble)
+
+```
+
+
+# Import mean SHAP dataframes of the five most important predictors 
+
+```{r import mean SHAP dfs }
+
+tic("load mean SHAP df of the 5 most important predictors")
+
+shap_df_path_tcd = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/TCD_mean_SHAP_df.csv"
+shap_df_tcd <- data.table::fread(shap_df_path_tcd, select = c(1,2,8), header = TRUE)
+
+shap_df_path_broadleaf = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/broadleaf_perc_mean_SHAP_df.csv"
+shap_df_broadleaf <- data.table::fread(shap_df_path_broadleaf, select = c(1,2,8), header = TRUE)
+
+shap_df_path_canopy = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/canopyheight_mean_SHAP_df.csv"
+shap_df_canopy <- data.table::fread(shap_df_path_canopy, select = c(1,2,8), header = TRUE)
+
+shap_df_path_spei = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/SPEI_sameyear_mean_SHAP_df.csv"
+shap_df_spei <- data.table::fread(shap_df_path_spei, select = c(1,2,8), header = TRUE)
+
+shap_df_path_et = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/ET_1year_mean_SHAP_df.csv"
+shap_df_et <- data.table::fread(shap_df_path_et, select = c(1,2,8), header = TRUE)
+
+toc()
+
+tic.clearlog()
+
+glimpse(shap_df_canopy)
+
+# load mean SHAP df of the 5 most important predictors: 172.4 sec elapsed
+# glimpse(shap_df_canopy)
+# Rows: 10,439,063
+# Columns: 3
+# First two columns are the coordinates, third column is the mean_SHAP value for each coordinate 
+
+```
+
+```{r rename the colnames}
+
+colnames(shap_df_tcd)[3] <- "TCD"
+colnames(shap_df_broadleaf)[3] <- "broadleaf_perc"
+colnames(shap_df_canopy)[3] <- "canopyheight"
+colnames(shap_df_spei)[3] <- "SPEI_sameyear"
+colnames(shap_df_et)[3] <- "ET_1year"
+
+glimpse(shap_df_canopy)
+# x 
+# y
+# canopyheight
+# It worked!
+
+```
+
+```{r merge Top 5 Predictor dataframes to a single dataframe}
+
+combined_df <- cbind(shap_df_tcd[, c("TCD")], shap_df_broadleaf[, c("broadleaf_perc")], 
+                     shap_df_canopy[, c("canopyheight")], shap_df_spei[, c("SPEI_sameyear")], 
+                     shap_df_et[, c("ET_1year")])
+
+glimpse(combined_df)
+# looks fine
+# I will add the coordinate columns later, because otherwise, the next step won't work. 
+
+```
+
+# Most important predictor 
+
+The most important of these 5 predictors is calculated per row (coordinate).
+The highest absolute SHAP value means most important predictor for that coordinate. 
+
+```{r most important predictor }
+
+# Find the column index of the most important predictor for each row
+most_important_col <- max.col(m = abs(combined_df), ties.method = "first")
+
+# Get the column names corresponding to the most important predictor
+most_important_predictor <- colnames(combined_df)[most_important_col]
+
+# Create a list of the most important predictor for each row
+most_important_list <- as.list(most_important_predictor)
+
+# Print the list
+head(most_important_list)
+# seems fine
+
+```
+
+# Coordinates dataframe 
+
+I am adding the coordinates from one of the shap_dfs I already loaded. 
+
+```{r load coords }
+
+# first two columns are x and y 
+
+coords_df <- shap_df_tcd[, 1:2]
+
+glimpse(coords_df)
+
+# Rows: 10,439,063
+# Columns: 2
+# x
+# y
+
+```
+
+# Make into one df 
+
+```{r new df with coords }
+
+imp_df_coords = cbind(coords_df, most_important_predictor)
+
+glimpse(imp_df_coords)
+
+# Rows: 10,439,063
+# Columns: 3
+# x
+# y
+# most_important_predictor
+
+```
+
+# levels of predictors
+
+```{r convert to raster }
+
+imp_df_coords$most_important_predictor = as.factor(imp_df_coords$most_important_predictor)
+
+levels(imp_df_coords$most_important_predictor)
+
+# [1] "broadleaf_perc" "canopyheight"   "ET_1year"       "SPEI_sameyear"  "TCD"        
+
+
+levels_imp = data.frame(ID=1:5, most_important_predictor = c("broadleaf_perc", "canopyheight", "ET_1year", "SPEI_sameyear", "TCD" ))
+
+levels_imp
+
+# id
+#1	broadleaf_perc			
+#2	canopyheight			
+#3	ET_1year			
+#4	SPEI_sameyear			
+#5	TCD
+
+# add the id 1-5
+imp_df_coords = dplyr::full_join(imp_df_coords, levels_imp)
+
+```
+
+# Convert to raster
+
+```{r rasterize it }
+
+shap_df_plot = imp_df_coords
+shap_df_plot$most_important_predictor = NULL
+
+# make a raster
+mostimp_r = terra::rast(shap_df_plot, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+
+# the reason I converted to lonlat is to include the scalebar (it didnt work with the other projection)
+# interpolate w/ nearest neighbor so that integers remain as they are
+mostimp_lonlat = terra::project(x = mostimp_r, y = "+proj=longlat +datum=WGS84 +no_defs", method = "near")
+
+
+levels(mostimp_lonlat) = levels_imp
+
+terra::plot(mostimp_lonlat, col = c("#9467bd", "#d62728", "#ff7f0e", "#1f77b4", "#2ca02c"))
+      
+```
+
+```{r Save raster and csv file}
+
+# Save raster
+writeRaster(mostimp_lonlat, "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240430_mostimp_SHAP_Fig6/mostimp_predictor_raster.tif", overwrite = TRUE)
+
+# Load raster and check
+raster <- rast("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240430_mostimp_SHAP_Fig6/mostimp_predictor_raster.tif")
+plot(raster) 
+# looks fine!
+
+
+
+# Save mostimp predictor table
+write.table(imp_df_coords, file = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240430_mostimp_SHAP_Fig6/mostimp_predictor_df.csv", row.names = FALSE, col.names = TRUE)
+
+# Load mostimp predictor table and check
+test <- data.table::fread("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240430_mostimp_SHAP_Fig6/mostimp_predictor_df.csv", header = TRUE)
+glimpse(test)
+# looks fine!
+
+```
+
+# Import Brandenburg and Berlin border
+
+Keep Berlin in the plots :) 
+
+```{r import border }
+
+BB_border = readOGR(dsn = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border",
+                        layer = "Brandenburg_border")
+
+crs(BB_border)
+# CRS arguments: +proj=longlat +datum=WGS84 +no_defs 
+
+plot(BB_border)
+
+crs <- crs(mostimp_lonlat)
+
+# +proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs
+BB_LAEA = sp::spTransform(BB_border, CRSobj = crs)
+BB_border = BB_LAEA
+
+```
+```{r load cblind.plot() package and have a look at the colours}
+
+library(RColorBrewer)
+RColorBrewer::brewer.pal.info
+
+# Load the "Paired" palette
+paired_colors <- brewer.pal(12, "Paired")
+
+# I ended up not using these colours, but different ones. 
+
+```
+
+
+# Plot 
+
+```{r plot most imp }
+
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240430_mostimp_SHAP_Fig6/20240430_shap_mostimp_map.png", width = 8, height =7, units = "in", res = 300)
+
+# Set outer margins to accommodate legend
+par(oma = c(0, 0, 0, 3)) # I added this, because otherwise the legend was cut off. 
+
+raster::plot(mostimp_lonlat, col = c("orange", "magenta", "darkblue", "cyan", "#2ca02c"),
+             legend.args = list(text = "Most contributing predictor", line = 0.5, cex = 1, adj = 0.25),
+             legend = TRUE, axes = FALSE, box = FALSE)
+
+#plot(mostimp_lonlat, col = c("green3", "magenta3", "gold2", "dodgerblue", "forestgreen"),
+#     legend.only = TRUE, horizontal = FALSE , smallplot = c(0.87, 0.9, 0.17, 0.86),
+#     axis.args = list(cex.axis = 1.4), 
+#	legend.args = list(text = "Most contributing predictor", line = 0.5, cex = 1, adj = 0.25))
+
+# add scalebar 
+raster::scalebar(d = 50, # distance in km,
+                 xy = c(11.5, 51.5),
+                 type = "bar",
+                 divs = 2,
+                 below = "km",
+                 lonlat = TRUE,
+                 adj = c(0.5, -1.15),
+                 cex = 1.2)
+
+raster::plot(BB_border, add = TRUE)
+
+
+dev.off()
+
+```

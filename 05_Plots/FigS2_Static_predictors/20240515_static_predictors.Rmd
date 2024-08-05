@@ -1,0 +1,777 @@
+---
+title: "Figure S1: All predictors"
+author: "Katharina Horn"
+date: "2024-05-15"
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+library(cowplot)
+library(ggpubr)
+#library(geobuffer)
+library(rgeos)
+
+library(tools)
+library(tibble)
+
+```
+
+
+# Load Brandenburg border
+
+```{r import border }
+
+bb = readOGR(dsn = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border",
+                        layer = "Brandenburg_border_3035")
+
+crs(bb)
+# +proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs
+#BB_LAEA = sp::spTransform(BB_border, CRSobj = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+
+plot(bb)
+
+# crs(dem)
+# +proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs 
+
+BB_LAEA = sp::spTransform(bb, CRSobj = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+
+BB_LAEA
+
+
+# Load as sf object
+bb_st <- st_read("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border_3035.shp") # for mapping
+
+```
+```{r Test reprojecting slope to BB_LAEA}
+
+slope_new <- sp::spTransform(slope, CRSobj = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+
+```
+
+
+
+# Load predictor rasters
+
+TOTAL number of predictors: 41 (31 unique predictors - if we don’t count “time lags”)
+Therefore, I am loading the rasters of 31 predictors. 
+
+```{r load predictor files}
+
+# Meteorology and Drought indices
+# spei <- terra::rast()
+# smi <- rast()
+# ssm <- rast()
+# swi <- rast()
+# lst <- rast()
+# airtemp <- rast()
+# et <- rast()
+# rad <- rast()
+# gw_level <- rast()
+# gw_dist <- rast()
+
+# Vegetation
+tcd <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/tcd_proj.tif")
+canopy <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/canop_proj.tif")
+forest_type <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/Tree_species/treespec_proj.tif")
+forestedge <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/forprox_proj.tif")
+
+# Topography
+dem <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/DEM_proj.tif")
+twi <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/TWI_proj.tif")
+aspect <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/aspect_proj.tif")
+slope <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/slope_proj.tif")
+
+# Soil
+awc <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/NFK_proj.tif")
+bdod <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/bdod_proj.tif")
+cec <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/cec_proj.tif")
+cfvo <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/cfvo_proj.tif")
+clay <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/clay_proj.tif")
+nitrogen <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/nitrogen_proj.tif")
+ocd <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/ocd_proj.tif")
+ocs <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/ocs_proj.tif")
+sand <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/sand_proj.tif")
+silt <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/silt_proj.tif")
+soc <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/soc_proj.tif")
+
+# LULC
+agriculture <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/agprox_proj.tif")
+water <- raster::raster("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Static_data_proj/waterprox_proj.tif")
+
+
+```
+
+
+```{r Convert raster files to data frames for plotting with ggplot2 }
+
+# Topographic predictors
+dem_df <- as.data.frame(dem, xy = TRUE)
+slope_df <- as.data.frame(slope, xy = TRUE)
+aspect_df <- as.data.frame(aspect, xy = TRUE)
+twi_df <- as.data.frame(twi, xy = TRUE)
+
+# Soil predictors
+awc_df <- as.data.frame(awc, xy = TRUE)
+bdod_df <- as.data.frame(bdod, xy = TRUE)
+cec_df <- as.data.frame(cec, xy = TRUE)
+cfvo_df <- as.data.frame(cfvo, xy = TRUE)
+clay_df <- as.data.frame(clay, xy = TRUE)
+nitrogen_df <- as.data.frame(nitrogen, xy = TRUE)
+ocd_df <- as.data.frame(ocd, xy = TRUE)
+ocs_df <- as.data.frame(ocs, xy = TRUE)
+sand_df <- as.data.frame(sand, xy = TRUE)
+silt_df <- as.data.frame(silt, xy = TRUE)
+soc_df <- as.data.frame(soc, xy = TRUE)
+
+# Vegetation predictors
+tcd_df <- as.data.frame(tcd, xy = TRUE)
+canopy_df <- as.data.frame(canopy, xy = TRUE)
+forest_type_df <- as.data.frame(forest_type, xy = TRUE)
+forestedge_df <- as.data.frame(forestedge, xy = TRUE)
+
+# LULC
+agriculture_df <- as.data.frame(agriculture, xy = TRUE)
+water_df <- as.data.frame(water, xy = TRUE)
+
+
+```
+
+
+```{r Define color palettes}
+
+# Define color palettes
+col_topography <- (grDevices::terrain.colors(50))
+col_veg <- colorRampPalette(brewer.pal(8, "Greens"))(255)
+col_soil <- colorRampPalette(brewer.pal(8, "BrBG"))(255)
+col_anthropo <- colorRampPalette(brewer.pal(8, "RdBu"))(255)
+
+```
+
+
+```{r Test plot dem using ggplot2 }
+
+# Plot dem
+dem_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = DEM_mosaic_10m_Brandenburg), data = dem_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "m", colours = col_topography, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme 
+  guides(fill = guide_colorbar(barwidth = 0.5))  # adjust key width here
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/dem.png", height = 5, width = 5, 
+    units = "cm", res = 300)
+dem_plot
+dev.off()
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/aspect.png", height = 5, width = 5, 
+    units = "cm", res = 300)
+aspect_plot
+dev.off()
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/slope.png", height = 5, width = 5, 
+    units = "cm", res = 300)
+slope_plot
+dev.off()
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/twi.png", height = 5, width = 5, 
+    units = "cm", res = 300)
+twi_plot
+dev.off()
+
+
+```
+
+
+
+```{r Plot topographic predictors}
+
+# png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/S1_Predictors.png", height = 20.5, width = 17.5, 
+#     units = "cm", res = 300)
+# par(mfrow=c(5,4))
+
+## Topography
+# Plot dem
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Topography/S1_dem.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+dem_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = DEM_mosaic_10m_Brandenburg), data = dem_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "m", colours = col_topography, na.value = "white") +   # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +  # adjust scale bar size
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+dem_plot
+dev.off()
+
+
+# Plot aspect
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Topography/S1_aspect.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+aspect_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = dem_aspect_wbt), data = aspect_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "°", colours = col_topography, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+aspect_plot
+dev.off()
+
+# Plot slope
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Topography/S1_slope.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+slope_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = dem_slope_wbt), data = slope_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "°", colours = col_topography, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+slope_plot
+dev.off()
+
+# Plot twi
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Topography/S1_twi.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+twi_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = TWI_merged_wgs84), data = twi_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "", colours = col_topography, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+twi_plot
+dev.off()
+
+
+```
+
+
+``` {r plot Vegetation predictors}
+
+## Vegetation
+# Plot tcd
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Vegetation/S1_tcd.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+tcd_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = TCD_EPSG4326), data = tcd_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "%", colours = col_veg, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+tcd_plot
+dev.off()
+
+# Plot canopy
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Vegetation/S1_canopy.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+canopy_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = canopyheight_mosaic), data = canopy_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "m", colours = col_veg, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+canopy_plot
+dev.off()
+
+# Plot forest_type
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Vegetation/S1_forest_type.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+forest_type_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = species_class_sum), data = forest_type_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "%", colours = col_veg, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+forest_type_plot
+dev.off()
+
+# Plot forestedge
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Vegetation/S1_forestedge.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+forestedge_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = Forest_proximity), data = forestedge_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "m", colours = col_veg, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+forestedge_plot
+dev.off()
+
+
+```
+
+```{r plot Soil predictors}
+
+# Plot awc
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_awc.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+awc_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = NFKWe1000_250_bb_4326), data = awc_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "%", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+awc_plot
+dev.off()
+
+# Plot bdod
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_bdod.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+bdod_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = bdod_15_to_30cm), data = bdod_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "m", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+bdod_plot
+dev.off()
+
+# Plot cec
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_cec.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+cec_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = cec_15.30cm_mean), data = cec_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "mmol(c)/kg", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+cec_plot
+dev.off()
+
+# Plot cfvo
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_cfvo.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+cfvo_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = cfvo_15.30cm_mean), data = cfvo_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "cm³/dm³", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+cfvo_plot
+dev.off()
+
+gc()
+# Plot clay
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_clay.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+clay_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = clay_15.30cm_mean), data = clay_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "g/kg", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+clay_plot
+dev.off()
+
+gc()
+# Plot nitrogen
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_nitrogen.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+nitrogen_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = nitrogen_15.30cm_mean), data = nitrogen_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "cg/kg", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+nitrogen_plot
+dev.off()
+
+gc()
+# Plot ocd
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_ocd.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+ocd_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = ocd_15.30cm_mean), data = ocd_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "hg/m³", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+ocd_plot
+dev.off()
+
+gc()
+# Plot ocs
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_ocs.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+ocs_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = ocs_0.30cm_mean), data = ocs_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "t/ha", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+ocs_plot
+dev.off()
+
+gc()
+# Plot sand
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_sand.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+sand_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = sand_15.30cm_mean), data = sand_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "g/kg", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+sand_plot
+dev.off()
+
+gc()
+# Plot silt
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_silt.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+silt_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = silt_15.30cm_mean), data = silt_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "g/kg", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+silt_plot
+dev.off()
+
+gc()
+# Plot soc
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Soil/S1_soc.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+soc_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = soc_15.30cm_mean), data = soc_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "dg/kg", colours = col_soil, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+soc_plot
+dev.off()
+
+```
+
+
+```{r plot LULC}
+
+# Plot Distance to agriculture
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/LULC/S1_agriculture.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+agriculture_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = agriculture_proximity), data = agriculture_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "m", colours = col_anthropo, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+agriculture_plot
+dev.off()
+
+
+# Plot Distance to water bodies
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/LULC/S1_water.png", height = 3.4, width = 4.35, 
+    units = "cm", res = 300)
+water_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = water_proximity), data = water_df) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) + 
+  scale_fill_gradientn(name = "m", colours = col_anthropo, na.value = "white") +                                # set legend colours
+  labs(x = NULL, y = NULL)  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl", height = unit(0.05, "cm"), width_hint = 0.08) +                      # add scale bar
+  theme(legend.direction = "vertical", legend.box = "vertical", legend.position = "right") +
+  theme_void() + # no theme
+  theme(
+    legend.title = element_text(size = 6),          # Smaller legend title text
+    legend.text = element_text(size = 5),           # Smaller legend text
+    legend.key.size = unit(0.3, "cm"),              # Smaller legend keys
+    legend.direction = "vertical", 
+    legend.box = "vertical", 
+    legend.position = "right"
+  ) +
+  guides(fill = guide_colorbar(barwidth = 0.5, barheight = 4))  # Adjust color bar size
+water_plot
+dev.off()
+
+```

@@ -1,0 +1,375 @@
+---
+title: "Performance metrics (2019)"
+author: "Stenka Vulova"
+date: '2024-03-24'
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+#library(raster)
+library(terra)
+library(rgdal)
+library(lubridate)
+#library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+#library(rgeos)
+
+#library(grid)
+#library(spatstat)
+#library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+#library(ggspatial)
+#library(geobuffer)
+#library(rgeos)
+
+library(tools)
+
+library(data.table)
+
+library(caret)
+library(MLmetrics)
+
+
+library(pROC) # compute AUC 
+
+```
+
+# Load the true class df 
+
+These dataframes contain the true classes.
+
+```{r load true class df }
+
+tic("load true class")
+
+true_class_df = read.csv("E:/Data/Vulova/Topic_1/04_PROCESSED_DATA/20240415_dfs_true_class/true_class_2019.csv")
+
+toc()
+
+tictoc::tic.clearlog()
+# load true class: 41.42 sec elapsed
+
+
+glimpse(true_class_df)
+# Rows: 10,437,444
+# Columns: 5
+
+```
+
+# Load the modeled class df 
+
+```{r load mod class df }
+
+#  fread() function from the data.table package is known for its efficiency in reading large datasets. 
+
+tic("load modeled class")
+
+csv_file <- "E:/Data/Vulova/Topic_1/04_PROCESSED_DATA/20240415_SHAP_2019_new/X_all_2019_SHAP.csv"
+
+# Use fread() to read only the first column
+# first column is the modeled class
+modclass <- data.table::fread(csv_file, select = 1, header = TRUE)
+
+toc()
+
+tictoc::tic.clearlog()
+# load modeled class: 2.97 sec elapsed
+
+# Print the first few rows of the first column
+head(modclass)
+
+# same length (number of rows) as true class - check
+
+# change the column name
+names(modclass)[1] <- "mod_class"
+
+# add mod_class column to the main df
+true_class_df$mod_class = modclass$mod_class
+
+# make sure both columns have same levels (for the confusion matrix)
+
+true_class_df$mod_class <- factor(true_class_df$mod_class, levels = c(0, 1))
+
+true_class_df$true_class <- factor(true_class_df$true_class, levels = c(0, 1))
+
+head(true_class_df)
+
+```
+
+```{r Load 100k dataframes for the respective year to extract coordinates}
+
+train_2019_100k <- "E:/Data/Vulova/Topic_1/04_PROCESSED_DATA/20240415_mod_dfs_100K_new/sub_df_100K_2019_new.csv"
+
+# Use fread() to read only the first two columns
+# first column is the x coordinate
+# second column is the y coordinate
+# third column is NDMI_anomaly
+# 46th column is true_class
+# 47th column is coord_code
+
+coord_2019_100k <- data.table::fread(train_2019_100k, select = c(1,2,3,46,47), header = TRUE)
+head(coord_2019_100k)
+
+# Add same columns as in true_class_df
+#coord_2019_100k$true_class <- 1
+#coord_2019_100k$mod_class <- 1
+
+# Convert coord_2019_100k to a data frame
+coord_2019_df <- as.data.frame(coord_2019_100k)
+
+
+```
+
+We can use anti_join() function from dplyr to extract only those observations of the data frame that 
+do not contain the same coordinates as the 100k data frame of the respective year.
+The resulting subset should contain 100,000 observations less than before. 
+(Instead of 10,437,444 it should only be 10,337,444 observations)
+
+```{r create a subset excl. 100K of the respective year for model validation}
+
+#library(dplyr)
+
+# Identify rows in true_class_df that are not present in coord_2019_100k
+subset <- anti_join(true_class_df, coord_2019_100k, by = c('coord_code'))
+nrow(subset) # 10,337,444 it worked! 
+
+nrow(true_class_df) - nrow(subset)
+# 100,000
+
+```
+
+
+# Performance metrics 
+
+https://topepo.github.io/caret/measuring-performance.html#class 
+
+https://rdrr.io/cran/caret/man/confusionMatrix.html
+**positive**  
+an optional character string for the factor level that corresponds to a "positive" result (if that makes sense for your data). If there are only two factor levels, the first level will be used as the "positive" result. When mode = "prec_recall", positive is the same value used for relevant for functions precision, recall, and F_meas.table.
+
+The positive class is what you are most interested in or investigating. (https://medium.com/@asimango/the-positive-class-what-should-it-be-in-a-machine-learning-binary-classification-problem-36c316da1127).
+For my problem, I am more interested in damaged (1); therefore `positive = "1"`). 
+
+```{r Confusion Matrix}
+
+# #category_mapping = {"no_change": 0, "damaged": 1}
+
+conf_matrix <- caret::confusionMatrix(data = subset$mod_class, reference = subset$true_class, positive = "1")
+
+conf_matrix
+
+# OLD results with positive class 0
+
+#           Reference
+# Prediction       0       1
+#          0 4865968  791494
+#          1 1508108 3140601
+#                                           
+#                Accuracy : 0.7769          
+#                  95% CI : (0.7766, 0.7771)
+#     No Information Rate : 0.6185          
+#     P-Value [Acc > NIR] : < 2.2e-16       
+#                                           
+#                   Kappa : 0.5431          
+#                                           
+#  Mcnemar's Test P-Value : < 2.2e-16       
+#                                           
+#             Sensitivity : 0.7634          
+#             Specificity : 0.7987          
+#          Pos Pred Value : 0.8601          
+#          Neg Pred Value : 0.6756          
+#              Prevalence : 0.6185          
+#          Detection Rate : 0.4721          
+#    Detection Prevalence : 0.5489          
+#       Balanced Accuracy : 0.7811          
+#                                           
+#        'Positive' Class : 0          
+
+```
+# Katharina performance metrics 
+
+In order to extract all performance metrics without being rounded, I save them as separate values 
+to make sure to keep the unrounded values. Additionally, we need to compute AUC and F1-Score, as 
+those performance metrics are not computed by the confusionMatrix() command.
+
+
+```{r performance metrics: AUC & F1-score}
+
+# Performance metrics 
+accuracy <- conf_matrix$overall["Accuracy"]
+accuracy # 0.7768714 
+
+# Compute Precision
+# Precision = True Positive / (True Positive + False Positive) 
+# Therefore, it is equal to the "Pos Pred Value"
+precision <- conf_matrix$byClass["Pos Pred Value"]
+
+
+# Compute Recall 
+# Recall = True Positive / (True Positive + False Negative) 
+# Therefore, it is equal to "Sensitivity". 
+recall <- conf_matrix$byClass["Sensitivity"]
+
+
+# Convert true_class and mod_class to numeric to compute AUC and F1-score
+subset$mod_class <- as.numeric(subset$mod_class)
+subset$true_class <- as.numeric(subset$true_class)
+
+
+
+# Compute F1-Score
+# F1 Score = 2 * (Precision * Recall) / (Precision + Recall)
+f1_score <- 2 * (precision * recall) / (precision + recall)
+
+# Print performance metrics
+print(paste("Accuracy:", accuracy, "Precision:", precision, "Recall:", recall, "F1-Score:", f1_score))
+
+
+```
+
+# AUC
+
+```{r AUC }
+
+subset_auc = subset
+
+#head(subset_auc$mod_class)
+# 2 2 2 1 2 2
+
+#head(subset$mod_class)
+# 1 1 1 0 1 1
+
+#as.numeric previously converted 1 to 2, and 0 to 1
+
+# Convert true_class and mod_class to numeric to compute AUC and F1-score
+subset_auc$mod_class <- as.numeric(subset_auc$mod_class) - 1
+subset_auc$true_class <- as.numeric(subset_auc$true_class) -1
+
+# Compute AUC
+# AUC is the area under the curve. We need to compute first Receiver Operator Curve to compute the 
+# area under the curve (AUC). 
+
+library(pROC)
+roc_obj <- roc(response = subset_auc$true_class, predictor = subset_auc$mod_class, direction = "auto")
+AUC <- auc(roc_obj)
+
+AUC
+# Area under the curve: 0.7811
+
+# Setting levels: control = 0, case = 1
+#Setting direction: controls < cases
+#Area under the curve: 0.7811
+
+```
+
+
+# Stenka performance metrics (test) 
+
+```{r Stenka metrics }
+
+# https://topepo.github.io/caret/measuring-performance.html#class
+# # The confusionMatrix matrix frames the errors in terms of sensitivity and specificity.
+# In the case of information retrieval, the precision and recall might be more appropriate. In this case, the option mode can be used to get those statistics:
+
+conf_matrix_prec_recall <- caret::confusionMatrix(data = subset$mod_class, reference = subset$true_class, mode = "prec_recall", positive = "1")
+
+conf_matrix_prec_recall
+
+# Confusion Matrix and Statistics
+
+#          Reference
+#Prediction       0       1
+#         0 4865968  791494
+#         1 1508108 3140601
+                                          
+#               Accuracy : 0.7769          
+#                 95% CI : (0.7766, 0.7771)
+#    No Information Rate : 0.6185          
+#    P-Value [Acc > NIR] : < 2.2e-16       
+                                          
+#                  Kappa : 0.5431          
+                                          
+# Mcnemar's Test P-Value : < 2.2e-16       
+                                          
+#              Precision : 0.6756          
+#                 Recall : 0.7987          
+#                     F1 : 0.7320          
+#             Prevalence : 0.3815          
+#         Detection Rate : 0.3047          
+#   Detection Prevalence : 0.4511          
+#      Balanced Accuracy : 0.7811          
+                                          
+#       'Positive' Class : 1 
+
+# Again, the positive argument can be used to control which factor level is associated with a “found” or “important” document or sample.
+
+
+# Extract precision, recall, and F1-score
+accuracy <- conf_matrix_prec_recall$overall["Accuracy"]
+precision <- conf_matrix_prec_recall$byClass["Precision"]
+recall <- conf_matrix_prec_recall$byClass["Recall"]
+f1_score <- conf_matrix_prec_recall$byClass["F1"]
+
+# Print the results
+print(paste("Accuracy:", accuracy))
+print(paste("Precision:", precision))
+print(paste("Recall:", recall))
+print(paste("F1-score:", f1_score))
+print(paste("AUC:", AUC))
+
+
+```
+``` {r Check Katharina's metrics}
+
+# Compare to Katharina method
+
+# Compute Precision
+# Precision = True Positive / (True Positive + False Positive) 
+# Therefore, it is equal to the "Pos Pred Value"
+precision_KH <- conf_matrix$byClass["Pos Pred Value"]
+
+
+# Compute Recall 
+# Recall = True Positive / (True Positive + False Negative) 
+# Therefore, it is equal to "Sensitivity". 
+recall_KH <- conf_matrix$byClass["Sensitivity"]
+
+# Compute F1-Score
+# F1 Score = 2 * (Precision * Recall) / (Precision + Recall)
+f1_score_KH <- 2 * (precision_KH * recall_KH) / (precision_KH + recall_KH)
+
+# Print performance metrics KH
+print(paste("Precision:", precision_KH, "Recall:", recall_KH, "F1-Score:", f1_score_KH))
+
+
+# Compare my method of metrics vs. Katharinas 
+print(paste("Accuracy:", accuracy))
+
+print(paste("Precision:", precision))
+print(paste("Precision KH:", precision_KH))
+# same 
+
+print(paste("Recall:", recall))
+print(paste("Recall KH:", recall_KH))
+
+print(paste("F1-score:", f1_score))
+print(paste("F1-score KH:", f1_score_KH))
+
+# "Precision: 0.675585630333067 Recall: 0.798709339423386 F1-Score: 0.732006231583894"
+# they all match :) 

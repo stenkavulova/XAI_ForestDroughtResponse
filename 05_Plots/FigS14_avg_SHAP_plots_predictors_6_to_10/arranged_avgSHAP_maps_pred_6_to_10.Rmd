@@ -1,0 +1,257 @@
+---
+title: 'Fig 5: Mean SHAP values of five most important predictors'
+author: "Katharina Horn"
+date: "2024-05-13"
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+library(rgeos)
+
+library(tools)
+library(tibble)
+
+```
+
+# Import Brandenburg and Berlin border
+
+Keeping Berlin in the plots.
+
+``` {r Load Berlin-Brandenburg border}
+
+bb <- terra::vect("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border_3035.shp") # for cropping of data frames
+
+# Load as sf object
+bb_st <- st_read("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border_3035.shp") # for mapping
+
+```
+
+## Load five predictor data frames
+
+
+```{r load data frames of mean SHAP values of five most important predictors}
+
+forest_prox_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/forest_prox_mean_SHAP_df.csv"
+ET_sameyear_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/ET_sameyear_mean_SHAP_df.csv"
+LST_sameyear_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/LST_sameyear_mean_SHAP_df.csv"
+SSM_sameyear_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/SSM_sameyear_mean_SHAP_df.csv"
+airtemp_1year_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/airtemp_1year_mean_SHAP_df.csv"
+
+# first two columns are x and y ´
+# 8th column is mean_shap across all years
+
+forest_prox_df <- data.table::fread(forest_prox_path, select = c(1,2,8), header = TRUE)
+ET_sameyear_df <- data.table::fread(ET_sameyear_path, select = c(1,2,8), header = TRUE)
+LST_sameyear_df <- data.table::fread(LST_sameyear_path, select = c(1,2,8), header = TRUE)
+SSM_sameyear_df <- data.table::fread(SSM_sameyear_path, select = c(1,2,8), header = TRUE)
+airtemp_1year_df <- data.table::fread(airtemp_1year_path, select = c(1,2,8), header = TRUE)
+
+glimpse(airtemp_1year_df)
+# looks fine
+
+
+```
+
+## Raster conversion is not needed, since I am plotting with ggplot() and therefore need data frames instead of raster files. 
+
+```{r convert to raster }
+
+# broadleaf_SHAP_rast = terra::rast(broadleaf_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+# canopy_SHAP_rast = terra::rast(canopy_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+# ET_SHAP_rast = terra::rast(ET_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+# SPEI_SHAP_rast = terra::rast(SPEI_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+# TCD_SHAP_rast = terra::rast(TCD_df, type = "xyz", crs = "+proj=laea +lat_0=52 +lon_0=10 +x_0=4321000 +y_0=3210000 +ellps=GRS80 +units=m +no_defs")
+# 
+# # the reason I converted to lonlat is to include the scalebar (it didnt work with the other projection)
+# broadleaf_SHAP_rast_lonlat = terra::project(x = broadleaf_SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+# canopy_SHAP_rast_lonlat = terra::project(x = canopy_SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+# ET_SHAP_rast_lonlat = terra::project(x = ET_SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+# SPEI_SHAP_rast_lonlat = terra::project(x = SPEI_SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+# TCD_SHAP_rast_lonlat = terra::project(x = TCD_SHAP_rast, y = "+proj=longlat +datum=WGS84 +no_defs")
+
+
+
+# # convert to raster::raster for plotting
+# SHAP_r = raster::raster(SHAP_rast_lonlat)
+# 
+# raster::plot(SHAP_r, colNA = "lightgray", col=colorRampPalette(c("#460000", "#930c0c", "#ff2100", "#ff980c",
+#                                  "#fcf599", "#00ff9b", "#39b5ff","#002ae7",
+#                                 "#020d47"))(255),
+#              legend.args = list(text = "SHAP value", line = 0.5, cex = 1, adj = 0.25))
+# 
+# minValue(SHAP_r) # -0.6971202
+# maxValue(SHAP_r) # 1.486262
+
+
+```
+
+# Define color scale
+
+```{r Define color scale}
+
+colors <- colorRampPalette(c("#020d47", "#002ae7", "#39b5ff", "#00ff9b", "#fcf599", "#ff980c", "#F36802", "#F82602", "#7F0000"))(255)
+
+```
+
+# Plot mean SHAP of all five predictors
+
+```{r Plot mean SHAP of all five predictors separately}
+
+# Define range for colors for plotting
+color_limits_forest_prox <- c(-0.5, 0.5)   # forest_prox, LST_sameyear, SSM_sameyear
+color_limits_ET_sameyear <- c(-0.35, 0.35) # ET_sameyear, airtemp_1year
+color_limits <- c(-0.35, 0.35)
+
+# Plot forest_prox_SHAP
+forest_prox_SHAP <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = mean_SHAP), data = forest_prox_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits, guide = "colorbar", breaks = c(color_limits[1], 0, color_limits[2]), oob = scales::squish) +    # set legend colours
+  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal", legend.position = "bottom") +
+  theme_void() +
+  theme(legend.position = "bottom")                                                           # no theme
+
+forest_prox_SHAP
+
+# Plot ET_sameyear_SHAP
+ET_sameyear_SHAP <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = mean_SHAP), data = ET_sameyear_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits, guide = "colorbar", breaks = c(color_limits[1], 0, color_limits[2]), oob = scales::squish) +    labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal") +
+  theme_void() +
+  theme(legend.position = "bottom")                                                           # no theme
+
+ET_sameyear_SHAP
+
+# Plot LST_sameyear_SHAP
+LST_sameyear_SHAP <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = mean_SHAP), data = LST_sameyear_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits, guide = "colorbar", breaks = c(color_limits[1], 0, color_limits[2]), oob = scales::squish) +                            # set legend colours  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal") +
+  theme_void() +
+  theme(legend.position = "bottom")                                                           # no theme
+
+LST_sameyear_SHAP
+
+# Plot SSM_sameyear_SHAP
+color_limits_SSM_sameyear <- c(-0.3, 0.3)
+  
+SSM_sameyear_SHAP <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = mean_SHAP), data = SSM_sameyear_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits, guide = "colorbar", breaks = c(color_limits[1], 0, color_limits[2]), oob = scales::squish) +                            # set legend colours  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal") +
+  theme_void()    +
+  theme(legend.position = "bottom")                                                        # no theme
+
+SSM_sameyear_SHAP
+
+# Plot airtemp_1year_SHAP
+airtemp_1year_SHAP <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = mean_SHAP), data = airtemp_1year_df) +       # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits, guide = "colorbar", breaks = c(color_limits[1], 0, color_limits[2]), oob = scales::squish) +                            # set legend colours
+  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme_void() +                                                           # no theme
+  theme(legend.direction = "horizontal", legend.box = "horizontal") +
+  theme(legend.position = "bottom")
+
+airtemp_1year_SHAP
+
+
+```
+
+# Get legend of the plots
+
+I can extract a legend from one of the plots since all of them are based on the same min() and max() values
+for each year. 
+
+```{r Get legend of one of the plots to use as joint legend for all plots}
+
+library(cowplot)
+library(ggpubr)
+
+
+leg <- get_legend(forest_prox_SHAP)
+
+# Convert to a ggplot object
+leg <- as_ggplot(leg)
+
+```
+
+# Arrange and export plots
+
+```{r Arrange resulting plots}
+
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240529_mostimp_SHAP_S4_pred_6_to_10/predictors_6_to_10_avgSHAP_map.png", width = 17.5, height = 12, units = "cm", res = 300)
+par(mar = c(5,5,5,8))
+predictors_avgSHAP <- ggarrange(forest_prox_SHAP, ET_sameyear_SHAP, LST_sameyear_SHAP, SSM_sameyear_SHAP, airtemp_1year_SHAP, leg, 
+                                ncol = 3, nrow = 2, legend = "none")
+
+predictors_avgSHAP
+
+dev.off()
+
+```
+# Export legends
+
+Lastly, I am saving the legends as png files so that I can combine everything in Inkscape. 
+
+```{r Save legends as png files}
+
+# Export legends as png files for arranging in inkscape
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240425_mostimp_SHAP_avg_maps/leg1_forest_prox.png", width = 5.9, height = 2, units = "cm", res = 300)
+leg
+dev.off()
+
+
+# I am saving the legend, so that I can arrange all the maps with the legend in Inkscape to make it look nicer. 
+
+```

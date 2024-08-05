@@ -1,0 +1,142 @@
+---
+title: "Count cloud-free images from Datacube"
+author: "Katharina Horn"
+date: "2024-06-03"
+output: html_document
+---
+
+```{r Load required packages}
+
+library(sp)
+#library(raster)
+library(terra)
+library(rgdal)
+library(lubridate)
+#library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+#library(rgeos)
+
+#library(grid)
+#library(spatstat)
+#library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+#library(ggspatial)
+#library(geobuffer)
+#library(rgeos)
+
+library(tools)
+
+library(data.table)
+
+library(caret)
+library(MLmetrics)
+
+
+```
+
+## Filter datacube files
+
+I am loading the folder of every Brandenburg tile that contains all Sentinel and Landsat images. Then I will filter the images by "LEVEL2" (cloud-free) and by date (only including images taken in August of 2013 to 2022.
+
+```{r load folders}
+
+# List files
+path_all = "F:/deu/Brandenburg"
+
+folders <- list.dirs(path_all, full.names = TRUE, recursive = FALSE)
+folders
+
+# Define arguments, I want to filter the data by
+prefixes <- c("201308","201408","201508","201608","201708", "201808", "201908", "202008", "202108", "202208")
+keyword <- "LEVEL2"
+
+```
+
+
+## Count number of files for each tile of each year (2013 to 2022) for the month of August
+
+Count files in a way so that only one file for each available date of August of the years of 2013 to 2022 is counted, considering
+the processing level (LEVEL 2) and the month (August / "08"). 
+
+```{r}
+
+count_files <- function(folder, prefixes, keyword) {
+    # List all files in the folder
+    files <- list.files(folder, full.names = TRUE)
+    
+    # Initialize a vector to store the counts
+    counts <- sapply(prefixes, function(prefix) {
+        # Extract files that match the prefix, keyword, and have a .tif extension
+        matching_files <- files[sapply(files, function(file) {
+            file_name <- basename(file)
+            startsWith(file_name, prefix) && grepl(keyword, file_name) && grepl("\\.tif$", file_name)
+        })]
+        
+        # Extract unique dates from the matching files
+        unique_dates <- unique(sapply(matching_files, function(file) {
+            file_name <- basename(file)
+            # Assuming the date is the first 8 characters in the filename
+            substr(file_name, 1, 8)
+        }))
+        
+        # Count the number of unique dates
+        length(unique_dates)
+    })
+    
+    return(counts)
+}
+
+
+```
+
+
+```{r}
+
+counts_list <- lapply(folders, count_files, prefixes, keyword)
+
+# Convert the list of counts to a data frame
+counts_df <- do.call(rbind, counts_list)
+rownames(counts_df) <- basename(folders)  # Optional: use folder names as row names
+colnames(counts_df) <- prefixes
+
+# Print the results
+print(counts_df)
+
+# Minimum and maximum amount of files per year
+min(counts_df) # 0
+max(counts_df) # 16
+
+# Compute the sum of each column
+sums <- colSums(counts_df)
+
+# Add the sums as the final row
+counts_df <- rbind(counts_df, SUM = sums)
+
+# Print the results
+print(counts_df)
+
+
+# Export the data frame to a CSV file
+write.csv(counts_df, file = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/NDMI_number_of_processed_images/satellite_image_counts.csv", row.names = TRUE)
+
+```
+
+
+
+
+
+
+
+

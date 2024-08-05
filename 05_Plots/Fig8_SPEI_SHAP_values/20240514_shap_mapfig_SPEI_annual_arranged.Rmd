@@ -1,0 +1,271 @@
+---
+title: "SPEI_annual_maps"
+author: "Katharina Horn"
+date: "2024-05-14"
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+library(rgeos)
+
+library(tools)
+library(tibble)
+
+```
+
+
+# Import Brandenburg and Berlin border
+
+Keeping Berlin in the plots.
+
+``` {r Load Berlin-Brandenburg border}
+
+bb <- terra::vect("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border_3035.shp") # for cropping of data frames
+
+# Load as sf object
+bb_st <- st_read("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/Brandenburg Border/Brandenburg_border_3035.shp") # for mapping
+
+```
+
+
+# SHAP dataframe
+
+```{r import the df }
+
+# tic("load SHAP df")
+# 
+# # Define path
+# shap_df_path_2018 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2018_SHAP.csv"
+# shap_df_path_2019 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2019_SHAP.csv"
+# shap_df_path_2020 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2020_SHAP.csv"
+# shap_df_path_2021 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2021_SHAP.csv"
+# shap_df_path_2022 = "D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2022_SHAP.csv"
+
+# Read only the header of the one of the files using read.table
+# header <- read.table("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/SHAP.df_NEW/dfs/X_all_2018_SHAP.csv", header = TRUE, nrows = 1, sep = ",")
+# header
+# Second row is the first predictor (X0.1) followed by the other predictors (X1, X2, ...)
+
+# # Use fread() to read only the first column
+# # first column is the modeled class
+# 
+# # SPEI_sameyear is column 26 originally, so it is column 27 here
+# # because first column here is the predicted classes, then the SHAP values for the predictors
+# 
+# shap_df_2018 <- data.table::fread(shap_df_path_2018, select = 27, header = TRUE)
+# shap_df_2019 <- data.table::fread(shap_df_path_2019, select = 27, header = TRUE)
+# shap_df_2020 <- data.table::fread(shap_df_path_2020, select = 27, header = TRUE)
+# shap_df_2021 <- data.table::fread(shap_df_path_2021, select = 27, header = TRUE)
+# shap_df_2022 <- data.table::fread(shap_df_path_2022, select = 27, header = TRUE)
+# 
+# toc()
+# 
+# tic.clearlog()
+
+
+# Load dataframe that contains SPEI SHAP values of all years
+shap_df_path = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240423_mean_SHAP_dfs/SPEI_sameyear_mean_SHAP_df.csv"
+
+# column names: "x"         "y"         "2018"      "2019"      "2020"      "2021"      "2022"      "mean_SHAP"
+
+# Use fread() to read specific columns
+# I need all years and the coordinates x & y
+
+shap_df <- data.table::fread(shap_df_path, select = c(1,2,3,4,5,6,7), header = TRUE)
+
+glimpse(shap_df)
+
+
+```
+```{r Create subsets for each year}
+
+# Subset for year 2018
+subset_2018 <- shap_df[, c("x", "y", "2018")]
+subset_2019 <- shap_df[, c("x", "y", "2019")]
+subset_2020 <- shap_df[, c("x", "y", "2020")]
+subset_2021 <- shap_df[, c("x", "y", "2021")]
+subset_2022 <- shap_df[, c("x", "y", "2022")]
+
+
+# Convert to data frame
+SPEI_2018 <- data.frame(subset_2018)
+SPEI_2019 <- data.frame(subset_2019)
+SPEI_2020 <- data.frame(subset_2020)
+SPEI_2021 <- data.frame(subset_2021)
+SPEI_2022 <- data.frame(subset_2022)
+
+```
+
+
+```{r Define color scale}
+
+colors <- colorRampPalette(c("#020d47", "#002ae7", "#39b5ff", "#00ff9b", "#fcf599", "#ff980c", "#F36802", "#F82602", "#7F0000"))(255)
+
+```
+
+# Plot mean SHAP of all five predictors
+
+```{r Plot mean SHAP of all five predictors separately}
+
+color_limits_SPEI <- c(-0.6, 0.6)
+# Plot SPEI_sameyear (2018)
+
+SPEI_2018_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = X2018), data = SPEI_2018) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits_SPEI, guide = "colorbar", breaks = c(color_limits_SPEI[1], 0, color_limits_SPEI[2]),
+                       na.value="white", oob = scales::squish) +                                # set legend colours
+  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal", legend.position = "bottom") +
+  theme_void() +
+  theme(legend.position = "bottom")                                       # no theme
+
+#SPEI_2018_plot
+
+
+# Plot SPEI_sameyear (2019)
+
+SPEI_2019_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = X2019), data = SPEI_2019) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits_SPEI, guide = "colorbar", breaks = c(color_limits_SPEI[1], 0, color_limits_SPEI[2]),
+                       na.value="white", oob = scales::squish) +                                # set legend colours
+  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal", legend.position = "bottom") +
+  theme_void() +
+  theme(legend.position = "bottom")                                       # no theme
+
+#SPEI_2019_plot
+
+# Plot SPEI_sameyear (2020)
+
+SPEI_2020_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = X2020), data = SPEI_2020) +             # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits_SPEI, guide = "colorbar", breaks = c(color_limits_SPEI[1], 0, color_limits_SPEI[2]),
+                       na.value="white", oob = scales::squish) +                                # set legend colours
+  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                      # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal", legend.position = "bottom") +
+  theme_void() +
+  theme(legend.position = "bottom")                                       # no theme
+
+#SPEI_2020_plot
+
+# Plot SPEI_sameyear (2021)
+
+SPEI_2021_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = X2021), data = SPEI_2021) +            # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits_SPEI, guide = "colorbar", breaks = c(color_limits_SPEI[1], 0, color_limits_SPEI[2]),
+                       na.value="white", oob = scales::squish) +                               # set legend colours
+  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                     # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal", legend.position = "bottom") +
+  theme_void() +
+  theme(legend.position = "bottom")                                      # no theme
+
+#SPEI_2021_plot
+
+# Plot SPEI_sameyear (2022)
+
+SPEI_2022_plot <- ggplot() +
+  geom_tile(aes(x=x, y=y, fill = X2022), data = SPEI_2022) +            # add filtered raster data set (excl. outliers)
+  geom_sf(bb_st, mapping = aes(), color = 'black', fill = NA) +                       
+  scale_fill_gradientn(colours = colors, limits = color_limits_SPEI, guide = "colorbar", breaks = c(color_limits_SPEI[1], 0, color_limits_SPEI[2]),
+                       na.value="white", oob = scales::squish) +                               # set legend colours
+  labs(x = NULL, y = NULL, fill = "SHAP values")  +
+  scale_x_continuous(breaks = seq(11.0, 15.0, by = 1)) +
+  scale_y_continuous(breaks = seq(51.0, 54, by = 1)) +
+  annotation_scale(style = "bar", location = "bl") +                     # add scale bar
+  theme(legend.direction = "horizontal", legend.box = "horizontal", legend.position = "bottom") +
+  theme_void() +
+  theme(legend.position = "bottom")                                      # no theme
+
+#SPEI_2022_plot
+
+
+```
+
+
+# Arrange and export plots
+
+In Inkscape, I will add the label headings (aligning did not work out well within ggarrange() and I will add the scales as well. 
+
+```{r Arrange resulting plots}
+
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240422_SHAP_predictor_maps/20240423_SPEI_sameyear_SHAP_plots/SPEI_SHAP_allyears.png", 
+    width = 17.5, height = 12, 
+    units = "cm", res = 300)
+
+SPEI_all_years <- ggarrange(SPEI_2018_plot, SPEI_2019_plot, SPEI_2020_plot, SPEI_2021_plot, SPEI_2022_plot,
+                            labels = c("2018", "2019", "2020", "2021", "2022"),
+                            ncol = 3, nrow = 2, 
+                            legend = "none")
+
+SPEI_all_years
+
+dev.off()
+
+```
+
+# Get legend of one of the plots
+
+I can extract a legend from one of the plots since all of them are based on the same min() and max() values
+for each year. 
+
+```{r Get legend of the arranged plot}
+
+leg <- get_legend(SPEI_2018_plot)
+
+# Convert to a ggplot object
+leg <- as_ggplot(leg)
+leg
+
+png("D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240422_SHAP_predictor_maps/20240423_SPEI_sameyear_SHAP_plots/leg_SPEI_SHAP_allyears.png", 
+    width = 6.1, height = 6, 
+    units = "cm", res = 300)
+leg
+dev.off()
+
+
+```

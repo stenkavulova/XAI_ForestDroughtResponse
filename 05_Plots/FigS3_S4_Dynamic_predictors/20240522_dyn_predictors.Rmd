@@ -1,0 +1,281 @@
+---
+title: "Dynamic predictors"
+author: "Katharina Horn"
+date: "2024-05-22"
+output: html_document
+---
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+#library(raster)
+#library(rgdal)
+library(lubridate)
+#library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+#library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+library(cowplot)
+library(ggpubr)
+#library(geobuffer)
+
+library(tools)
+library(tibble)
+
+```
+
+
+# Load predictor rasters
+
+TOTAL number of predictors: 41 (31 unique predictors - if we don’t count “time lags”)
+Therefore, I am loading the rasters of the dynamic predictors.
+Those are SPEI, SMI, SSM, SWI, LST, Air temperature, Evapotranspiration, direct radiation, ground water level, and ground water level trend
+for the years of 2017 to 2022 (six layers per predictor). This makes a total of 60 plots. 
+
+```{r load annual predictor files}
+
+# Meteorology and Drought indices
+spei <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Annual/SPEI_annual_2017_to_2022.tif")
+smi <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Annual/SMI_annual_2017_to_2022.tif")
+ssm <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Annual/SSM_annual_2017_to_2022.tif")
+swi <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Annual/SWI_15cm_annual_2017_to_2022.tif")
+lst <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Annual/LST_annual_2017_to_2022.tif")
+airtemp <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Annual/airtemp_annual_2017_to_2022.tif")
+et <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Annual/ET_annual_2017_to_2022.tif")
+rad <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Annual/rad_direct_annual_2017_to_2022.tif")
+gw_level <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Annual/groundwater_annual_2017_to_2022.tif")
+gw_trend <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Annual/gw_trend_annual_2017_to_2022.tif")
+
+```
+
+
+```{r load jan-jul predictor files}
+
+airtemp_jj <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Jan_to_July/airtemp_JanJuly_2017_to_2022.tif")
+ET_jj <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Jan_to_July/ET_JanJuly_2017_to_2022.tif")
+rad_jj <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Jan_to_July/rad_direct_JanJuly_2017_to_2022.tif")
+SMI_jj <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Jan_to_July/SMI_JanJuly_2017_to_2022.tif")
+SPEI_jj <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Jan_to_July/SPEI_JanJuly_2017_to_2022.tif")
+SSM_jj <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Jan_to_July/SSM_JanJuly_2017_to_2022.tif")
+SWI_jj <- terra::rast("D:/Nextcloud/Documents/CliWaC/04_PROCESSED DATA/20230926_data_proj/Dynamic_data_proj/Jan_to_July/SWI_15cm_JanJuly_2017_to_2022.tif")
+
+
+```
+
+
+```{r Define color scale}
+
+colors <- colorRampPalette(c("#020d47", "#002ae7", "#39b5ff", "#00ff9b", "#fcf599", "#ff980c", "#F36802", "#F82602", "#7F0000"))(255)
+
+colors_rev <- rev(colors)
+
+```
+
+
+```{r Plot Page 1 of dynamic predictors}
+
+# spei
+spei_layers <- c(spei[[1]], spei[[2]], spei[[3]], spei[[4]], spei[[5]], spei[[6]])
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Annual/S1_dyn_pred_spei2.png", 
+    height = 3.5, width = 20, units = "cm", res = 300)
+
+terra::panel(spei_layers, nc = 6, nr = 1, range = c(-1.6, 1.6), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors_rev, axes = FALSE)
+dev.off()
+
+# smi
+smi_layers <- c(smi[[1]], smi[[2]], smi[[3]], smi[[4]], smi[[5]], smi[[6]])
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Annual/S1_dyn_pred_smi.png", 
+    height = 3.5, width = 20, units = "cm", res = 300)
+terra::panel(smi_layers, nc = 6, nr = 1, range = c(0, 0.8), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors_rev, axes = FALSE)
+dev.off()
+
+# ssm
+ssm_layers <- c(ssm[[1]], ssm[[2]], ssm[[3]], ssm[[4]], ssm[[5]], ssm[[6]])
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Annual/S1_dyn_pred_ssm.png", 
+    height = 3.5, width = 20, units = "cm", res = 300)
+terra::panel(ssm_layers, nc = 6, nr = 1, range = c(0, 100), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors_rev, axes = FALSE)
+dev.off()
+
+# swi
+swi_layers <- c(swi[[1]], swi[[2]], swi[[3]], swi[[4]], swi[[5]], swi[[6]])
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Annual/S1_dyn_pred_swi.png", 
+    height = 3.5, width = 20, units = "cm", res = 300)
+terra::panel(swi_layers, nc = 6, nr = 1, range = c(25, 86), 
+             main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors_rev, axes = FALSE)
+dev.off()
+
+# lst
+lst_layers <- c(lst[[1]], lst[[2]], lst[[3]], lst[[4]], lst[[5]], lst[[6]])
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Annual/S1_dyn_pred_lst.png", 
+    height = 3.5, width = 20, units = "cm", res = 300)
+terra::panel(lst_layers, nc = 6, nr = 1, range = c(10, 50), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors, axes = FALSE)
+dev.off()
+
+
+```
+
+```{r Plot Page 2 of dynamic predictors}
+
+# airtemp
+airtemp_layers <- c(airtemp[[1]], airtemp[[2]], airtemp[[3]], airtemp[[4]], airtemp[[5]], airtemp[[6]])
+
+airtemp_layers
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/S1_dyn_pred_airtemp.png", 
+    height = 3.5, width = 20, units = "cm", res = 300)
+terra::panel(airtemp_layers, nc = 6, nr = 1, range = c(8.9, 11.9), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors, axes = FALSE)
+dev.off()
+
+# et
+et_layers <- c(et[[1]], et[[2]], et[[3]], et[[4]], et[[5]], et[[6]])
+
+et_layers
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/S1_dyn_pred_et.png", 
+    height = 3.5, width = 20, units = "cm", res = 300)
+terra::panel(et_layers, nc = 6, nr = 1, range = c(323, 510), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors, axes = FALSE)
+dev.off()
+
+# rad
+rad_layers <- c(rad[[1]], rad[[2]], rad[[3]], rad[[4]], rad[[5]], rad[[6]])
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/S1_dyn_pred_rad.png", 
+    height = 3.5, width = 20, units = "cm", res = 300)
+terra::panel(rad_layers, nc = 6, nr = 1, range = c(440, 732), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors, axes = FALSE)
+dev.off()
+
+# gw_level
+gw_level_layers <- c(gw_level[[1]], gw_level[[2]], gw_level[[3]], gw_level[[4]], gw_level[[5]], gw_level[[6]])
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/S1_dyn_pred_gw_level.png", 
+    height = 3.5, width = 20, units = "cm", res = 300)
+terra::panel(gw_level_layers, nc = 6, nr = 1, range = c(0.7, 18.3), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors, axes = FALSE)
+dev.off()
+
+# gw_trend
+gw_trend_layers <- c(gw_trend[[1]], gw_trend[[2]], gw_trend[[3]], gw_trend[[4]], gw_trend[[5]], gw_trend[[6]])
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/S1_dyn_pred_gw_trend.png", 
+    height = 3.5, width = 20, units = "cm", res = 300)
+terra::panel(gw_trend_layers, nc = 6, nr = 1, range = c(-0.5, 0.35), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors_rev, axes = FALSE)
+dev.off()
+
+
+```
+
+
+
+```{r Plot Page 3: Jan_July predictors}
+
+# SPEI_jj
+SPEI_jj_layers <- c(SPEI_jj[[1]], SPEI_jj[[2]], SPEI_jj[[3]], SPEI_jj[[4]], SPEI_jj[[5]], SPEI_jj[[6]])
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Jan_July/S1_dyn_pred_SPEI_jj.png", 
+    height = 4.1, width = 20, units = "cm", res = 300)
+
+terra::panel(SPEI_jj_layers, nc = 6, nr = 1, range = c(-1.5, 1.15), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors_rev, axes = FALSE)
+dev.off()
+
+
+# SSM_jj
+SSM_jj_layers <- c(SSM_jj[[1]], SSM_jj[[2]], SSM_jj[[3]], SSM_jj[[4]], SSM_jj[[5]], SSM_jj[[6]])
+
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Jan_July/S1_dyn_pred_SSM_jj.png", 
+    height = 4.1, width = 20, units = "cm", res = 300)
+
+terra::panel(SSM_jj_layers, nc = 6, nr = 1, range = c(0, 100), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors_rev, axes = FALSE)
+dev.off()
+
+
+# SMI_jj
+SMI_jj_layers <- c(SMI_jj[[1]], SMI_jj[[2]], SMI_jj[[3]], SMI_jj[[4]], SMI_jj[[5]], SMI_jj[[6]])
+SMI_jj_layers
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Jan_July/S1_dyn_pred_SMI_jj.png", 
+    height = 4.1, width = 20, units = "cm", res = 300)
+
+terra::panel(SMI_jj_layers, nc = 6, nr = 1, range = c(0, 1), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors_rev, axes = FALSE)
+dev.off()
+
+# SWI_jj
+SWI_jj_layers <- c(SWI_jj[[1]], SWI_jj[[2]], SWI_jj[[3]], SWI_jj[[4]], SWI_jj[[5]], SWI_jj[[6]])
+SWI_jj_layers
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Jan_July/S1_dyn_pred_SWI_jj.png", 
+    height = 4.1, width = 20, units = "cm", res = 300)
+
+terra::panel(SWI_jj_layers, nc = 6, nr = 1, range = c(20, 87), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors_rev, axes = FALSE)
+dev.off()
+
+```
+
+```{r plot Page 4: Jan_july dynamic predictors}
+
+# airtemp_jj
+airtemp_jj_layers <- c(airtemp_jj[[1]], airtemp_jj[[2]], airtemp_jj[[3]], airtemp_jj[[4]], airtemp_jj[[5]], airtemp_jj[[6]])
+airtemp_jj_layers
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Jan_July/S1_dyn_pred_airtemp_jj.png", 
+    height = 5.5, width = 20, units = "cm", res = 300)
+
+terra::panel(airtemp_jj_layers, nc = 6, nr = 1, range = c(8, 12), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors, axes = FALSE)
+dev.off()
+
+# ET_jj
+ET_jj_layers <- c(ET_jj[[1]], ET_jj[[2]], ET_jj[[3]], ET_jj[[4]], ET_jj[[5]], ET_jj[[6]])
+ET_jj_layers
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Jan_July/S1_dyn_pred_ET_jj.png", 
+    height = 5.5, width = 20, units = "cm", res = 300)
+
+terra::panel(ET_jj_layers, nc = 6, nr = 1, range = c(230, 340), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors, axes = FALSE)
+dev.off()
+
+# rad_jj
+rad_jj_layers <- c(rad_jj[[1]], rad_jj[[2]], rad_jj[[3]], rad_jj[[4]], rad_jj[[5]], rad_jj[[6]])
+rad_jj_layers
+png(filename = "D:/Nextcloud/Documents/CliWaC/05_RESULTS/20240515_supplement_figure_predictors/Dynamic/Jan_July/S1_dyn_pred_rad_jj.png", 
+    height = 5.5, width = 20, units = "cm", res = 300)
+
+terra::panel(rad_jj_layers, nc = 6, nr = 1, range = c(320, 525), main = c("2017", "2018", "2019", "2020", "2021", "2022"), 
+             loc.main = "bottomleft", col = colors, axes = FALSE)
+dev.off()
+
+
+```
+
+

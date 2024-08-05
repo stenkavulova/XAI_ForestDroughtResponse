@@ -1,0 +1,172 @@
+---
+title: "Resample groundwater_level to MODIS"
+author: "Stenka Vulova"
+date: '2023-06-05'
+output: html_document
+---
+
+New groundwater_level raster from Katharina 
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+library(rgeos)
+
+library(tools)
+
+```
+
+# Import datasets
+
+## groundwater_level
+
+I will resample groundwater_level to MODIS NDVI (1 km resolution).
+This version has not been reclassified (it has 13 classes, 1-13).
+
+```{r import groundwater_level }
+
+groundwater_level = terra::rast("D:/Stenka_Cliwac/Topic_1/03_RAW_DATA/20230612_groundwaterdepth_Fabio/gwdepth_classes_100m.tif")
+terra::crs(groundwater_level)
+
+terra::plot(groundwater_level, col = colorRampPalette(c("#460000", "#930c0c", "#ff2100", "#ff980c",
+                                 "#fcf599", "#00ff9b", "#39b5ff","#002ae7",
+                                "#020d47"))(255))
+
+# , range = c (0,360)
+
+groundwater_level
+#class       : SpatRaster 
+#dimensions  : 2446, 2336, 1  (nrow, ncol, nlyr)
+#resolution  : 100, 100  (x, y)
+#extent      : 3250148, 3483748, 5690525, 5935125  (xmin, xmax, ymin, ymax)
+#coord. ref. : ETRS89_UTM_Zone33_BB_7 
+#source      : gwdepth_classes_100m.tif 
+#name        : gwdepth_classes_100m 
+
+```
+
+## MODIS NDVI
+
+```{r import MODIS NDVI }
+
+NDVI = terra::rast("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230327_MODIS_NDVI_anom_forest/NDVI_anomaly_2019_forest.tif")
+terra::crs(NDVI)
+terra::crs(groundwater_level)
+
+terra::plot(NDVI)
+
+NDVI
+
+```
+
+
+## Import Brandenburg and Berlin border
+
+```{r import border }
+
+BB_border = readOGR(dsn = "D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230214_Brandenburg_border",
+                        layer = "BB_border_merged")
+
+crs(BB_border)
+# CRS arguments: +proj=longlat +datum=WGS84 +no_defs 
+
+plot(BB_border)
+
+BB_vect = terra::vect(BB_border)
+
+terra::plot(BB_vect)
+
+```
+
+# Function project_crop_save
+
+1) Project a given raster to the NDVI raster (MODIS)
+2) Crop to the Brandenburg border  
+3) return or save the raster
+
+```{r function project_crop_save }
+
+# x: Spatraster 
+# y: SpatRaster to project to; e.g. MODIS NDVI in this example 
+# border: Spatvector type of polygon to mask the raster to; the Brandenburg border in this example 
+# filepath: ENTIRE filepath to save tif file to, e.g. "D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230522_static_data_proj/groundwater_level_proj.tif"
+
+project_crop_save = function(x, y, border, filepath) {
+  
+  x_proj = terra::project(x = x, y = y) # project
+  
+  mask = terra::mask(x_proj, border) 
+  
+  terra::writeRaster(x = mask, filename = filepath )
+}
+
+```
+
+# Run project_crop_save
+
+```{r run function }
+
+project_crop_save(x = groundwater_level, y = NDVI, border = BB_vect,
+                  filepath = "D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230522_static_data_proj/groundwater_level_proj.tif")
+
+```
+
+# Check result
+
+```{r check result }
+
+groundwater_level_proj = terra::rast("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230522_static_data_proj/groundwater_level_proj.tif")
+terra::plot(groundwater_level_proj, col = colorRampPalette(c("#460000", "#930c0c", "#ff2100", "#ff980c",
+                                 "#fcf599", "#00ff9b", "#39b5ff","#002ae7",
+                                "#020d47"))(255))
+
+stack = c(groundwater_level_proj, NDVI)
+
+terra::plot(stack)
+
+cor = layerCor(stack, "pearson", na.rm = TRUE)
+cor$pearson # 0.1439414   
+
+```
+
+## Check correlation
+
+```{r check corr}
+
+groundwater_level_r = as.numeric(values(raster::raster(groundwater_level_proj)))
+NDVI_r = as.numeric(values(raster::raster(NDVI)))
+
+# Calculate Pearson's correlation coefficient
+correlation <- cor(groundwater_level_r, NDVI_r, use = "pairwise.complete.obs", method = "pearson")
+
+correlation 
+
+```
+

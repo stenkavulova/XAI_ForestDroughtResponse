@@ -1,0 +1,174 @@
+---
+title: "Resample TWI to MODIS"
+author: "Stenka Vulova"
+date: '2023-06-15'
+output: html_document
+---
+
+New TWI raster from Katharina 
+
+# Libraries 
+
+```{r libs, include = FALSE }
+
+library(sp)
+library(raster)
+library(rgdal)
+library(lubridate)
+library(maptools)
+library(ggplot2)
+library(tidyr)
+library(plyr)
+library(dplyr)
+library(RColorBrewer)
+library(reshape2)
+library(scales)
+library(readr)
+library(rgeos)
+
+library(grid)
+library(spatstat)
+library(sf)
+
+library(zoo)
+library(tictoc) # benchmarking
+
+library(terra)
+
+library(ggspatial)
+#library(geobuffer)
+library(rgeos)
+
+library(tools)
+
+```
+
+# Import datasets
+
+## TWI
+
+I will resample TWI to MODIS NDVI (1 km resolution).
+This version has not been reclassified (it has 13 classes, 1-13).
+
+```{r import TWI }
+
+TWI = terra::rast("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230530_Topography/TWI/TWI_merged_wgs84.tif")
+terra::crs(TWI)
+
+terra::plot(TWI, col = colorRampPalette(c("#460000", "#930c0c", "#ff2100", "#ff980c",
+                                 "#fcf599", "#00ff9b", "#39b5ff","#002ae7",
+                                "#020d47"))(255))
+
+# , range = c (0,360)
+
+TWI
+#class       : SpatRaster 
+#dimensions  : 22154, 47464, 1  (nrow, ncol, nlyr)
+#resolution  : 0.0001273666, 0.0001273666  (x, y)
+#extent      : 9.682033, 15.72736, 50.88576, 53.70744  (xmin, xmax, ymin, ymax)
+#coord. ref. : lon/lat WGS 84 (EPSG:4326) 
+#source      : TWI_merged_wgs84.tif 
+#name        : TWI_merged_wgs84 
+#min value   :        -8.478123 
+#max value   :         38.07537
+
+```
+
+## MODIS NDVI
+
+```{r import MODIS NDVI }
+
+NDVI = terra::rast("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230327_MODIS_NDVI_anom_forest/NDVI_anomaly_2019_forest.tif")
+terra::crs(NDVI)
+terra::crs(TWI)
+
+terra::plot(NDVI)
+
+NDVI
+
+```
+
+
+## Import Brandenburg and Berlin border
+
+```{r import border }
+
+BB_border = readOGR(dsn = "D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230214_Brandenburg_border",
+                        layer = "BB_border_merged")
+
+crs(BB_border)
+# CRS arguments: +proj=longlat +datum=WGS84 +no_defs 
+
+plot(BB_border)
+
+BB_vect = terra::vect(BB_border)
+
+terra::plot(BB_vect)
+
+```
+
+# Function project_crop_save
+
+1) Project a given raster to the NDVI raster (MODIS)
+2) Crop to the Brandenburg border  
+3) return or save the raster
+
+```{r function project_crop_save }
+
+# x: Spatraster 
+# y: SpatRaster to project to; e.g. MODIS NDVI in this example 
+# border: Spatvector type of polygon to mask the raster to; the Brandenburg border in this example 
+# filepath: ENTIRE filepath to save tif file to, e.g. "D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230522_static_data_proj/TWI_proj.tif"
+
+project_crop_save = function(x, y, border, filepath) {
+  
+  x_proj = terra::project(x = x, y = y) # project
+  
+  mask = terra::mask(x_proj, border) 
+  
+  terra::writeRaster(x = mask, filename = filepath )
+}
+
+```
+
+# Run project_crop_save
+
+```{r run function }
+
+project_crop_save(x = TWI, y = NDVI, border = BB_vect,
+                  filepath = "D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230522_static_data_proj/TWI_proj.tif")
+
+```
+
+# Check result
+
+```{r check result }
+
+TWI_proj = terra::rast("D:/Stenka_Cliwac/Topic_1/04_PROCESSED_DATA/20230522_static_data_proj/TWI_proj.tif")
+terra::plot(TWI_proj, col = colorRampPalette(c("#460000", "#930c0c", "#ff2100", "#ff980c",
+                                 "#fcf599", "#00ff9b", "#39b5ff","#002ae7",
+                                "#020d47"))(255))
+
+stack = c(TWI_proj, NDVI)
+
+terra::plot(stack)
+
+cor = layerCor(stack, "pearson", na.rm = TRUE)
+cor$pearson # 0.07553126  
+
+```
+
+## Check correlation
+
+```{r check corr}
+
+TWI_r = as.numeric(values(raster::raster(TWI_proj)))
+NDVI_r = as.numeric(values(raster::raster(NDVI)))
+
+# Calculate Pearson's correlation coefficient
+correlation <- cor(TWI_r, NDVI_r, use = "pairwise.complete.obs", method = "pearson")
+
+correlation # 0.09516853
+
+```
+
